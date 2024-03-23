@@ -30,12 +30,12 @@ public:
         return outgoingAdjList.size();
     }
 
-    int getOutgoingNeighborCount(int i) {
-        return outgoingAdjList[i].size();
+    int getOutgoingNeighborCount(int node) {
+        return outgoingAdjList[node].size();
     }
 
-    int getIncomingNeighborCount(int i) {
-        return incomingAdjList[i].size();
+    int getIncomingNeighborCount(int node) {
+        return incomingAdjList[node].size();
     }
 
     int getOutgoingNeighbor(int node, int index) {
@@ -61,12 +61,12 @@ public:
 
     void printGraph() {
         for (int i = 0; i < getV(); i++) {
-            cout << i << ": out ";
+            cout << i << "'s out node: ";
             for (auto v : outgoingAdjList[i]) {
                 cout << v.first << ' ';
             }
             cout << endl;
-            cout << i << ": in ";
+            cout << i << "'s in node: ";
             for (auto v : incomingAdjList[i]) {
                 cout << v.first << ' ';
             }
@@ -283,16 +283,12 @@ private:
     pair<int, int> pathLengthRange;
 
     vector<DfsState> stack;
-
     vector<pair<Edge, Direction>> currentPath;
 
     vector<unique_ptr<Predicate>> predicates;
 
-public:
-    void addPredicate(unique_ptr<Predicate> p) {
-        predicates.push_back(move(p));
-    }
     Graph& graph;
+public:
     PathIterator(Graph& g, int start, pair<int, int> pathLengthRange)
         : graph(g), pathLengthRange(pathLengthRange) {
         stack.push_back({start, 0, 0});
@@ -322,10 +318,9 @@ public:
                 auto weight =
                     graph.getOutgoingWeight(currentNode, neighborIndex);
 
-                DfsState nextState = {neighbor, 0, currentLevel + 1};
                 neighborIndex++;
+                DfsState nextState = {neighbor, 0, currentLevel + 1};
                 stack.push_back(nextState);
-                pair<Edge, Direction> newPair;
                 currentPath.push_back(make_pair<Edge, Direction>(
                     {currentNode, neighbor, weight}, Direction::OUT));
 
@@ -342,9 +337,9 @@ public:
                     currentNode, neighborIndex - outgoingNeighborCount);
                 auto weight = graph.getIncomingWeight(
                     currentNode, neighborIndex - outgoingNeighborCount);
-
-                DfsState nextState = {neighbor, 0, currentLevel + 1};
+                
                 neighborIndex++;
+                DfsState nextState = {neighbor, 0, currentLevel + 1};
                 stack.push_back(nextState);
                 currentPath.push_back(make_pair<Edge, Direction>(
                     {currentNode, neighbor, weight}, Direction::IN));
@@ -370,6 +365,10 @@ public:
         }
         return false;
     }
+
+    void addPredicate(unique_ptr<Predicate> p) {
+        predicates.push_back(move(p));
+    }
 };
 
 PathIterator getIterator(Graph& g, int start, pair<int, int> pathLengthRange) {
@@ -378,6 +377,7 @@ PathIterator getIterator(Graph& g, int start, pair<int, int> pathLengthRange) {
 }
 
 int main() {
+    // graph_data.txt
     ifstream inputFile("graph_data.txt");
     if (!inputFile) {
         cerr << "Failed to open the input file." << endl;
@@ -396,8 +396,9 @@ int main() {
 
     inputFile.close();
 
+    // input.txt
     ifstream inputFile2("input.txt");
-    if (!inputFile) {
+    if (!inputFile2) {
         cerr << "Failed to open the input file." << endl;
         return 1;
     }
@@ -405,13 +406,14 @@ int main() {
     // start left_range right_range
     int startVertex;
     pair<int, int> pathLengthRange;
-    inputFile2 >> startVertex >> pathLengthRange.first >> pathLengthRange.second;
+    inputFile2 >> startVertex >> pathLengthRange.first >>
+        pathLengthRange.second;
 
-    auto iter = getIterator(g, startVertex, pathLengthRange);
+    PathIterator iter = getIterator(g, startVertex, pathLengthRange);
 
     // number of predicates
-    // 0-5(head, last, Asc, Desc, min, max)
-    // 0-5(GT, GE, LT, LE, EQ, NE)
+    // 0-5(Head, Last, Asc, Desc, Min, Max),
+    // 0-5(GT, GE, LT, LE, EQ, NE),
     // operand
     int numPredicates;
     vector<CompareOp> opList = {CompareOp::GT, CompareOp::GE, CompareOp::LT,
@@ -472,7 +474,6 @@ int main() {
             cout << output[i].first.t;
         }
         cout << endl;
-        // cout << output.back().first.t << endl;
     }
 
     return 0;
