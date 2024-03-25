@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Copyright 2022 AntGroup CO., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,11 +17,13 @@
 //
 #pragma once
 
-#include <cstddef>
+// #include <cstddef>
+// #include <cstdint>
+// #include <vector>
 #include <cstdint>
-#include <vector>
 #include "core/data_type.h"
 #include "cypher/execution_plan/ops/op.h"
+#include "filter/filter.h"
 
 #ifndef NDEBUG
 #define VAR_LEN_EXP_DUMP_FOR_DEBUG()                                                         \
@@ -48,40 +50,42 @@ struct DfsState {
 enum class CompareOp { GT, GE, LT, LE, EQ, NE };
 
 class Predicate {
-public:
-    virtual bool eval(const Path&) = 0;
+ public:
+    virtual bool eval(const Path &) = 0;
 };
 
 class HeadPredicate : public Predicate {
-private:
+ private:
     CompareOp op;
     int64_t operand;
-public:
-    bool eval(const Path& path) {
+
+ public:
+    HeadPredicate(CompareOp op, int64_t operand) : op(op), operand(operand) {}
+    bool eval(const Path &path) {
         if (path.Empty()) return true;
         // get first edge's timestamp, check whether it fits the condition
         int64_t head = path.GetNthEdge(0).tid;
         switch (op) {
-            case CompareOp::GT:
-                return head > operand;
-                break;
-            case CompareOp::GE:
-                return head >= operand;
-                break;
-            case CompareOp::LT:
-                return head < operand;
-                break;
-            case CompareOp::LE:
-                return head <= operand;
-                break;
-            case CompareOp::EQ:
-                return head == operand;
-                break;
-            case CompareOp::NE:
-                return head != operand;
-                break;
-            default:
-                break;
+        case CompareOp::GT:
+            return head > operand;
+            break;
+        case CompareOp::GE:
+            return head >= operand;
+            break;
+        case CompareOp::LT:
+            return head < operand;
+            break;
+        case CompareOp::LE:
+            return head <= operand;
+            break;
+        case CompareOp::EQ:
+            return head == operand;
+            break;
+        case CompareOp::NE:
+            return head != operand;
+            break;
+        default:
+            break;
         }
         return false;
     }
@@ -348,19 +352,22 @@ class VarLenExpand : public OpBase {
         }
     }
 
-    OpResult NextWithLabelFilter(RTContext *ctx) {
+    OpResult NextWithFilter(RTContext *ctx) {
         if (state_ == Uninitialized) return OP_REFRESH;
         if (start_->PullVid() < 0) return OP_REFRESH;
+
         while (!stack.empty()) {
-            auto& currentState = stack.back();
+            auto &currentState = stack.back();
             auto currentNodeId = currentState.currentNodeId;
-            auto& currentEit = currentState.currentEit;
+            auto &currentEit = currentState.currentEit;
             auto currentLevel = currentState.level;
+
             if (currentLevel > max_hop_) {
                 stack.pop_back();
                 currentPath.PopBack();
                 continue;
             }
+
             if (currentEit.IsValid()) {
                 auto neighbor = currentEit.GetNbr(expand_direction_);
                 lgraph::EIter newEit;
@@ -383,7 +390,7 @@ class VarLenExpand : public OpBase {
         }
         return OP_DEPLETED;
     }
-    
+
     OpResult Next(RTContext *ctx) {
         do {
             if (NextWithoutLabelFilter(ctx) != OP_OK) return OP_REFRESH;
@@ -413,16 +420,17 @@ class VarLenExpand : public OpBase {
         Consuming,     /* ExpandAll consuming data. */
     } state_;
 
-    // stack for DFS, current path is relp_->path_
+    // temp used
+    std::shared_ptr<lgraph::Filter> edge_filter_ = nullptr;
+
+    // stack for DFS, current path is currentPath
     std::vector<DfsState> stack;
     Path currentPath;
 
     // keep predicates
     std::vector<std::unique_ptr<Predicate>> predicates;
     // add predicate to the vector
-    void addPredicate(std::unique_ptr<Predicate> p) {
-        predicates.push_back(std::move(p));
-    }
+    void addPredicate(std::unique_ptr<Predicate> p) { predicates.push_back(std::move(p)); }
 
     VarLenExpand(PatternGraph *pattern_graph, Node *start, Node *neighbor, Relationship *relp)
         : OpBase(OpType::VAR_LEN_EXPAND, "Variable Length Expand"),
@@ -451,6 +459,31 @@ class VarLenExpand : public OpBase {
         relp_rec_idx_ = rit->second.id;
         expand_counts_.resize(eits_.size());
         state_ = Uninitialized;
+    }
+
+    void PushFilter(std::shared_ptr<lgraph::Filter> filter) {
+        if (filter) {
+            if (filter->Type() == lgraph::Filter::RANGE_FILTER) {
+                std::shared_ptr<lgraph::RangeFilter> tmp_filter = std::static_pointer_cast<lgraph::RangeFilter>(filter);
+                if (tmp_filter->GetAeLeft().op.type == cypher::ArithOpNode::AR_OP_FUNC) {
+                    
+                }
+                
+            }
+
+            std::unique_ptr<Predicate> p(new HeadPredicate(CompareOp::GT, 1));
+            addPredicate(std::move(p));
+
+            PushFilter(filter->Left());
+            PushFilter(filter->Right());
+        }
+        return;
+    }
+
+    void PushDownEdgeFilter(std::shared_ptr<lgraph::Filter> edge_filter) {
+        edge_filter_ = edge_filter;
+        // add filter to local Predicates
+        PushFilter(edge_filter);
     }
 
     OpResult Initialize(RTContext *ctx) override {
@@ -508,9 +541,12 @@ class VarLenExpand : public OpBase {
         auto towards = expand_direction_ == FORWARD    ? "-->"
                        : expand_direction_ == REVERSED ? "<--"
                                                        : "--";
+        std::string edgefilter_str = "VarLenEdgeFilter";
         return fma_common::StringFormatter::Format(
-            "{}({}) [{} {}*{}..{} {}]", name, "All", start_->Alias(), towards,
-            std::to_string(min_hop_), std::to_string(max_hop_), neighbor_->Alias());
+            "{}({}) [{} {}*{}..{} {} {}]", name, "All", start_->Alias(), towards,
+            std::to_string(min_hop_), std::to_string(max_hop_), neighbor_->Alias(),
+            edge_filter_ ? edgefilter_str.append(" (").append(edge_filter_->ToString()).append(")")
+                         : "");
     }
 
     Node *GetStartNode() const { return start_; }
