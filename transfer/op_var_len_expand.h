@@ -17,6 +17,7 @@
 //
 #pragma once
 
+#include <memory>
 #include "core/data_type.h"
 #include "cypher/execution_plan/ops/op.h"
 #include "filter/filter.h"
@@ -41,6 +42,8 @@ struct DfsState {
     lgraph::EIter &currentEit;
     // level, or path length
     int level;
+
+    int count;
 };
 
 // enum class CompareOp { GT, GE, LT, LE, EQ, NE };
@@ -129,7 +132,7 @@ class IsAscPredicate : public Predicate {
     IsAscPredicate() {}
     bool eval(const Path &path) {
         if (path.Empty()) return true;
-        for (int i = 0; i < path.Length() - 1; i++) {
+        for (size_t i = 0; i < path.Length() - 1; i++) {
             int64_t a = path.GetNthEdge(i).tid;
             int64_t b = path.GetNthEdge(i + 1).tid;
             if (a >= b) return false;
@@ -143,7 +146,7 @@ class IsDescPredicate : public Predicate {
     IsDescPredicate() {}
     bool eval(const Path &path) {
         if (path.Empty()) return true;
-        for (int i = 0; i < path.Length() - 1; i++) {
+        for (size_t i = 0; i < path.Length() - 1; i++) {
             int64_t a = path.GetNthEdge(i).tid;
             int64_t b = path.GetNthEdge(i + 1).tid;
             if (a <= b) return false;
@@ -164,7 +167,7 @@ class MaxInListPredicate : public Predicate {
     bool eval(const Path &path) {
         if (path.Empty()) return true;
         int64_t maxinlist = path.GetNthEdge(0).tid;
-        for (int i = 1; i < path.Length(); i++) {
+        for (size_t i = 1; i < path.Length(); i++) {
             maxinlist = std::max(maxinlist, path.GetNthEdge(i).tid);
         }
         switch (op) {
@@ -203,7 +206,7 @@ class MinInListPredicate : public Predicate {
     bool eval(const Path &path) {
         if (path.Empty()) return true;
         int64_t mininlist = path.GetNthEdge(0).tid;
-        for (int i = 1; i < path.Length(); i++) {
+        for (size_t i = 1; i < path.Length(); i++) {
             mininlist = std::min(mininlist, path.GetNthEdge(i).tid);
         }
         switch (op) {
@@ -497,6 +500,16 @@ class VarLenExpand : public OpBase {
         if (state_ == Uninitialized) return OP_REFRESH;
         if (start_->PullVid() < 0) return OP_REFRESH;
 
+        if (state_ == Resetted) {
+            lgraph::EIter start_eit;
+            size_t count;
+            lgraph::VertexId start_vid = start_->PullVid();
+            if (start_vid < 0) return OP_REFRESH;
+            _InitializeEdgeIter(ctx, start_vid, start_eit, count);
+            stack.push_back({start_->PullVid(), start_eit, 0});
+            state_ = Consuming;
+        }
+
         while (!stack.empty()) {
             auto &currentState = stack.back();
             auto currentNodeId = currentState.currentNodeId;
@@ -517,6 +530,9 @@ class VarLenExpand : public OpBase {
                 DfsState nextState = {neighbor, newEit, currentLevel + 1};
                 stack.push_back(nextState);
                 currentPath.Append(currentEit.GetUid());
+
+
+
                 currentEit.Next();
             } else {
                 stack.pop_back();
@@ -612,7 +628,8 @@ class VarLenExpand : public OpBase {
                     std::transform(func_name.begin(), func_name.end(), func_name.begin(),
                                    ::tolower);
                     if (func_name == "isasc") {
-                        std::unique_ptr<Predicate> p(new IsAscPredicate());
+                        auto p = std::make_unique<IsAscPredicate>();
+                        // std::unique_ptr<Predicate> p(new IsAscPredicate());
                         addPredicate(std::move(p));
                     } else if (func_name == "isdesc") {
                         std::unique_ptr<Predicate> p(new IsDescPredicate());
@@ -669,10 +686,12 @@ class VarLenExpand : public OpBase {
         eits_.resize(max_hop_);
 
         // first node, add to stack
-        lgraph::EIter start_eit;
-        size_t count;
-        _InitializeEdgeIter(ctx, start_->PullVid(), start_eit, count);
-        stack.push_back({start_->PullVid(), start_eit, 0});
+
+        // lgraph::EIter start_eit;
+        // size_t count;
+        // lgraph::VertexId start_vid = start_->PullVid();
+        // _InitializeEdgeIter(ctx, start_vid, start_eit, count);
+        // stack.push_back({start_->PullVid(), start_eit, 0});
 
         return OP_OK;
     }
