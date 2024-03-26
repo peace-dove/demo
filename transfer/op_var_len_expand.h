@@ -17,10 +17,6 @@
 //
 #pragma once
 
-// #include <cstddef>
-// #include <cstdint>
-// #include <vector>
-#include <cstdint>
 #include "core/data_type.h"
 #include "cypher/execution_plan/ops/op.h"
 #include "filter/filter.h"
@@ -47,7 +43,7 @@ struct DfsState {
     int level;
 };
 
-enum class CompareOp { GT, GE, LT, LE, EQ, NE };
+// enum class CompareOp { GT, GE, LT, LE, EQ, NE };
 
 class Predicate {
  public:
@@ -56,33 +52,178 @@ class Predicate {
 
 class HeadPredicate : public Predicate {
  private:
-    CompareOp op;
+    lgraph::CompareOp op;
     int64_t operand;
 
  public:
-    HeadPredicate(CompareOp op, int64_t operand) : op(op), operand(operand) {}
+    HeadPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
     bool eval(const Path &path) {
         if (path.Empty()) return true;
         // get first edge's timestamp, check whether it fits the condition
         int64_t head = path.GetNthEdge(0).tid;
         switch (op) {
-        case CompareOp::GT:
+        case lgraph::CompareOp::LBR_GT:
             return head > operand;
             break;
-        case CompareOp::GE:
+        case lgraph::CompareOp::LBR_GE:
             return head >= operand;
             break;
-        case CompareOp::LT:
+        case lgraph::CompareOp::LBR_LT:
             return head < operand;
             break;
-        case CompareOp::LE:
+        case lgraph::CompareOp::LBR_LE:
             return head <= operand;
             break;
-        case CompareOp::EQ:
+        case lgraph::CompareOp::LBR_EQ:
             return head == operand;
             break;
-        case CompareOp::NE:
+        case lgraph::CompareOp::LBR_NEQ:
             return head != operand;
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
+};
+
+class LastPredicate : public Predicate {
+ private:
+    lgraph::CompareOp op;
+    int64_t operand;
+
+ public:
+    LastPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+    bool eval(const Path &path) {
+        if (path.Empty()) return true;
+        // get first edge's timestamp, check whether it fits the condition
+        int64_t last = path.GetNthEdge(path.Length() - 1).tid;
+        switch (op) {
+        case lgraph::CompareOp::LBR_GT:
+            return last > operand;
+            break;
+        case lgraph::CompareOp::LBR_GE:
+            return last >= operand;
+            break;
+        case lgraph::CompareOp::LBR_LT:
+            return last < operand;
+            break;
+        case lgraph::CompareOp::LBR_LE:
+            return last <= operand;
+            break;
+        case lgraph::CompareOp::LBR_EQ:
+            return last == operand;
+            break;
+        case lgraph::CompareOp::LBR_NEQ:
+            return last != operand;
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
+};
+
+class IsAscPredicate : public Predicate {
+ public:
+    IsAscPredicate() {}
+    bool eval(const Path &path) {
+        if (path.Empty()) return true;
+        for (int i = 0; i < path.Length() - 1; i++) {
+            int64_t a = path.GetNthEdge(i).tid;
+            int64_t b = path.GetNthEdge(i + 1).tid;
+            if (a >= b) return false;
+        }
+        return true;
+    }
+};
+
+class IsDescPredicate : public Predicate {
+ public:
+    IsDescPredicate() {}
+    bool eval(const Path &path) {
+        if (path.Empty()) return true;
+        for (int i = 0; i < path.Length() - 1; i++) {
+            int64_t a = path.GetNthEdge(i).tid;
+            int64_t b = path.GetNthEdge(i + 1).tid;
+            if (a <= b) return false;
+        }
+        return true;
+    }
+};
+
+// TODO
+
+class MaxInListPredicate : public Predicate {
+ private:
+    lgraph::CompareOp op;
+    int64_t operand;
+
+ public:
+    MaxInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+    bool eval(const Path &path) {
+        if (path.Empty()) return true;
+        int64_t maxinlist = path.GetNthEdge(0).tid;
+        for (int i = 1; i < path.Length(); i++) {
+            maxinlist = std::max(maxinlist, path.GetNthEdge(i).tid);
+        }
+        switch (op) {
+        case lgraph::CompareOp::LBR_GT:
+            return maxinlist > operand;
+            break;
+        case lgraph::CompareOp::LBR_GE:
+            return maxinlist >= operand;
+            break;
+        case lgraph::CompareOp::LBR_LT:
+            return maxinlist < operand;
+            break;
+        case lgraph::CompareOp::LBR_LE:
+            return maxinlist <= operand;
+            break;
+        case lgraph::CompareOp::LBR_EQ:
+            return maxinlist == operand;
+            break;
+        case lgraph::CompareOp::LBR_NEQ:
+            return maxinlist != operand;
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
+};
+
+class MinInListPredicate : public Predicate {
+ private:
+    lgraph::CompareOp op;
+    int64_t operand;
+
+ public:
+    MinInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+    bool eval(const Path &path) {
+        if (path.Empty()) return true;
+        int64_t mininlist = path.GetNthEdge(0).tid;
+        for (int i = 1; i < path.Length(); i++) {
+            mininlist = std::min(mininlist, path.GetNthEdge(i).tid);
+        }
+        switch (op) {
+        case lgraph::CompareOp::LBR_GT:
+            return mininlist > operand;
+            break;
+        case lgraph::CompareOp::LBR_GE:
+            return mininlist >= operand;
+            break;
+        case lgraph::CompareOp::LBR_LT:
+            return mininlist < operand;
+            break;
+        case lgraph::CompareOp::LBR_LE:
+            return mininlist <= operand;
+            break;
+        case lgraph::CompareOp::LBR_EQ:
+            return mininlist == operand;
+            break;
+        case lgraph::CompareOp::LBR_NEQ:
+            return mininlist != operand;
             break;
         default:
             break;
@@ -464,16 +605,43 @@ class VarLenExpand : public OpBase {
     void PushFilter(std::shared_ptr<lgraph::Filter> filter) {
         if (filter) {
             if (filter->Type() == lgraph::Filter::RANGE_FILTER) {
-                std::shared_ptr<lgraph::RangeFilter> tmp_filter = std::static_pointer_cast<lgraph::RangeFilter>(filter);
+                std::shared_ptr<lgraph::RangeFilter> tmp_filter =
+                    std::static_pointer_cast<lgraph::RangeFilter>(filter);
                 if (tmp_filter->GetAeLeft().op.type == cypher::ArithOpNode::AR_OP_FUNC) {
-                    
+                    std::string func_name = tmp_filter->GetAeLeft().op.func_name;
+                    std::transform(func_name.begin(), func_name.end(), func_name.begin(),
+                                   ::tolower);
+                    if (func_name == "isasc") {
+                        std::unique_ptr<Predicate> p(new IsAscPredicate());
+                        addPredicate(std::move(p));
+                    } else if (func_name == "isdesc") {
+                        std::unique_ptr<Predicate> p(new IsDescPredicate());
+                        addPredicate(std::move(p));
+                    } else if (func_name == "head") {
+                        lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                        auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                        std::unique_ptr<Predicate> p(new HeadPredicate(op, std::stoi(operand)));
+                        addPredicate(std::move(p));
+                    } else if (func_name == "last") {
+                        lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                        auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                        std::unique_ptr<Predicate> p(new LastPredicate(op, std::stoi(operand)));
+                        addPredicate(std::move(p));
+                    } else if (func_name == "maxinlist") {
+                        lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                        auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                        std::unique_ptr<Predicate> p(
+                            new MaxInListPredicate(op, std::stoi(operand)));
+                        addPredicate(std::move(p));
+                    } else if (func_name == "mininlist") {
+                        lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                        auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                        std::unique_ptr<Predicate> p(
+                            new MinInListPredicate(op, std::stoi(operand)));
+                        addPredicate(std::move(p));
+                    }
                 }
-                
             }
-
-            std::unique_ptr<Predicate> p(new HeadPredicate(CompareOp::GT, 1));
-            addPredicate(std::move(p));
-
             PushFilter(filter->Left());
             PushFilter(filter->Right());
         }
