@@ -43,10 +43,8 @@ struct DfsState {
     // level, or path length
     int level;
 
-    int count;
+    // int count;
 };
-
-// enum class CompareOp { GT, GE, LT, LE, EQ, NE };
 
 class Predicate {
  public:
@@ -255,132 +253,6 @@ class VarLenExpand : public OpBase {
         count = 1;
     }
 
-#if 0  // 20210704
-        void _CollectFrontierByDFS(RTContext *ctx, int64_t vid, const std::set<std::string> &types, int min_hop, int max_hop) { // NOLINT
-            if (hop_ >= min_hop) {
-                if (neighbor_->Label().empty()
-                    || ctx->txn_->GetVertexLabel(ctx->txn_->GetVertexIterator(vid)) == neighbor_->Label()) { // NOLINT
-                    frontier_buffer_.emplace(vid);
-                    path_buffer_.emplace(relp_->path_);
-                }
-#ifndef NDEBUG
-                FMA_DBG() << __func__ << ": hop=" << hop_ << ",vid=" << vid;
-                FMA_DBG() << pattern_graph_->VisitedEdges().Dump();
-#endif
-            }
-            if (hop_ == max_hop) return;
-            hop_++;
-            lgraph::EIter eit;
-            _InitializeEdgeIter(ctx, vid, eit);
-            while (eit.IsValid()) {
-                if (!pattern_graph_->VisitedEdges().Contains(eit)) {
-                    auto r = pattern_graph_->VisitedEdges().Add(eit);
-                    if (!r.second) CYPHER_INTL_ERR();
-                    relp_->path_.Append(eit.GetUid());
-                    _CollectFrontierByDFS(ctx, eit.GetNbr(expand_direction_), types, min_hop, max_hop); // NOLINT
-                    relp_->path_.PopBack();
-                    pattern_graph_->VisitedEdges().Erase(r.first);
-                }
-                eit.Next();
-            }
-            hop_--;
-        }
-
-        void _CollectFrontierByDFS(RTContext *ctx, int64_t vid, const std::set<std::string> &types, int min_hop) { // NOLINT
-            if (hop_ == min_hop) {
-                if (neighbor_->Label().empty()
-                    || ctx->txn_->GetVertexLabel(ctx->txn_->GetVertexIterator(vid)) == neighbor_->Label()) { // NOLINT
-                    frontier_buffer_.emplace(vid);
-                    path_buffer_.emplace(relp_->path_);
-                }
-#ifndef NDEBUG
-                FMA_LOG() << __func__ << ": hop=" << hop_ << ",vid=" << vid;
-                FMA_LOG() << pattern_graph_->VisitedEdges().Dump();
-#endif
-                return;
-            }
-            hop_++;
-            lgraph::EIter eit;
-            _InitializeEdgeIter(ctx, vid, eit);
-            while (eit.IsValid()) {
-                if (!pattern_graph_->VisitedEdges().Contains(eit)) {
-                    auto r = pattern_graph_->VisitedEdges().Add(eit);
-                    if (!r.second) CYPHER_INTL_ERR();
-                    relp_->path_.Append(eit.GetUid());
-                    _CollectFrontierByDFS(ctx, eit.GetNbr(expand_direction_), types, min_hop);
-                    relp_->path_.PopBack();
-                    pattern_graph_->VisitedEdges().Erase(r.first);
-                }
-                eit.Next();
-            }
-            hop_--;
-        }
-
-        OpResult Next(RTContext *ctx) {
-            if (state_ == Uninitialized) return OP_REFRESH;
-            /* Start node iterator may be invalid, such as when the start is an argument
-             * produced by OPTIONAL MATCH.  */
-            if (!start_it_->IsValid()) return OP_REFRESH;
-            auto &types = relp_->Types();
-            if (collect_all_ || min_hop_ == 0) {  // we didnot handle 0hop in other branch
-                if (state_ == Resetted) {
-                    relp_->path_.SetStart(start_it_->GetId());
-                    /* collect all the vertex, save them into result_buffer_ */
-                    _CollectFrontierByDFS(ctx, start_it_->GetId(), types,
-                                          min_hop_, max_hop_);
-                    state_ = Consuming;
-                }
-                if (frontier_buffer_.empty()) return OP_REFRESH;
-                nbr_it_->Initialize(ctx->txn_.get(), lgraph::VIter::VERTEX_ITER,
-                                    frontier_buffer_.front());
-                frontier_buffer_.pop();
-                relp_->path_ = path_buffer_.front();
-                path_buffer_.pop();
-            } else {
-                // produce one by one
-                if (state_ == Resetted) {
-                    relp_->path_.SetStart(start_it_->GetId());
-                    hop_ = 0;
-                    _CollectFrontierByDFS(ctx, start_it_->GetId(), types, min_hop_);
-                    state_ = Consuming;
-                }
-                if (frontier_buffer_.empty()) return OP_REFRESH;
-                auto vid = frontier_buffer_.front();
-                frontier_buffer_.pop();
-                nbr_it_->Initialize(ctx->txn_.get(), lgraph::VIter::VERTEX_ITER, vid);
-                relp_->path_ = path_buffer_.front();
-                path_buffer_.pop();
-                if (relp_->path_.Length() < max_hop_) {
-                    lgraph::EIter eit;
-                    _InitializeEdgeIter(ctx, vid, eit);
-                    // construct visitedEdges from relp_->path_
-                    pattern_graph_->VisitedEdges().euid_hash_set.clear();
-                    for (size_t i = 0; i < relp_->path_.Length(); i++) {
-                        pattern_graph_->VisitedEdges().euid_hash_set.emplace(relp_->path_.GetNthEdge(i)); // NOLINT
-                    }
-                    while (eit.IsValid()) {
-                        if (!pattern_graph_->VisitedEdges().Contains(eit)) {
-                            if (neighbor_->Label().empty() ||
-                                ctx->txn_->GetVertexLabel(
-                                    ctx->txn_->GetVertexIterator(vid)) ==
-                                    neighbor_->Label()) {
-                                frontier_buffer_.emplace(eit.GetNbr(expand_direction_));
-                                relp_->path_.Append(eit.GetUid());
-                                path_buffer_.emplace(relp_->path_);
-                                relp_->path_.PopBack();
-                            }
-                        }
-                        eit.Next();
-                    }
-                }
-            }  // if collect all
-#ifndef NDEBUG
-            FMA_DBG() << "[" << __FILE__ << "] neighbor:" << nbr_it_->GetId();
-#endif
-            return OP_OK;
-        }
-#endif
-
     bool PerNodeLimit(RTContext *ctx, size_t k) {
         return !ctx->per_node_limit_.has_value() ||
                expand_counts_[k] <= ctx->per_node_limit_.value();
@@ -497,19 +369,7 @@ class VarLenExpand : public OpBase {
     }
 
     OpResult NextWithFilter(RTContext *ctx) {
-        if (state_ == Uninitialized) return OP_REFRESH;
         if (start_->PullVid() < 0) return OP_REFRESH;
-
-        if (state_ == Resetted) {
-            lgraph::EIter start_eit;
-            size_t count;
-            lgraph::VertexId start_vid = start_->PullVid();
-            if (start_vid < 0) return OP_REFRESH;
-            _InitializeEdgeIter(ctx, start_vid, start_eit, count);
-            stack.push_back({start_->PullVid(), start_eit, 0});
-            state_ = Consuming;
-        }
-
         while (!stack.empty()) {
             auto &currentState = stack.back();
             auto currentNodeId = currentState.currentNodeId;
@@ -530,8 +390,6 @@ class VarLenExpand : public OpBase {
                 DfsState nextState = {neighbor, newEit, currentLevel + 1};
                 stack.push_back(nextState);
                 currentPath.Append(currentEit.GetUid());
-
-
 
                 currentEit.Next();
             } else {
@@ -685,32 +543,48 @@ class VarLenExpand : public OpBase {
         record->values[relp_rec_idx_].relationship = relp_;
         eits_.resize(max_hop_);
 
-        // first node, add to stack
-
-        // lgraph::EIter start_eit;
-        // size_t count;
-        // lgraph::VertexId start_vid = start_->PullVid();
-        // _InitializeEdgeIter(ctx, start_vid, start_eit, count);
-        // stack.push_back({start_->PullVid(), start_eit, 0});
-
         return OP_OK;
     }
+
+    // OpResult RealConsume(RTContext *ctx) override {
+    //     CYPHER_THROW_ASSERT(!children.empty());
+    //     auto child = children[0];
+    //     while (state_ == Uninitialized || Next(ctx) == OP_REFRESH) {
+    //         auto res = child->Consume(ctx);
+    //         relp_->path_.Clear();
+    //         state_ = Resetted;
+    //         if (res != OP_OK) {
+    //             /* When consume after the stream is DEPLETED, make sure
+    //              * the result always be DEPLETED.  */
+    //             state_ = Uninitialized;
+    //             return res;
+    //         }
+    //         /* Most of the time, the start_it is definitely valid after child's Consume
+    //          * returns OK, except when the child is an OPTIONAL operation.  */
+    //     }
+    //     return OP_OK;
+    // }
 
     OpResult RealConsume(RTContext *ctx) override {
         CYPHER_THROW_ASSERT(!children.empty());
         auto child = children[0];
-        while (state_ == Uninitialized || Next(ctx) == OP_REFRESH) {
+        while (NextWithFilter(ctx) != OP_OK) {
             auto res = child->Consume(ctx);
             relp_->path_.Clear();
-            state_ = Resetted;
+            if (start_->PullVid() < 0) continue;
+
             if (res != OP_OK) {
                 /* When consume after the stream is DEPLETED, make sure
                  * the result always be DEPLETED.  */
                 state_ = Uninitialized;
                 return res;
             }
-            /* Most of the time, the start_it is definitely valid after child's Consume
-             * returns OK, except when the child is an OPTIONAL operation.  */
+            // init the first of stack
+            lgraph::EIter start_eit;
+            size_t count;
+            lgraph::VertexId start_vid = start_->PullVid();
+            _InitializeEdgeIter(ctx, start_vid, start_eit, count);
+            stack.push_back({start_vid, start_eit, 0});
         }
         return OP_OK;
     }
