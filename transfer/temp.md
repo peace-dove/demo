@@ -30,18 +30,7 @@ lgraph_server -d restart
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 
 
-explain MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
-[e2:signIn]-(medium)
-WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
-head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
-last(getMemberProp(e1, 'timestamp')) < 1669690342640 AND
-e2.timestamp > 1627020616747 AND
-e2.timestamp < 1669690342640 AND
-medium.isBlocked = true
-RETURN DISTINCT other.id as otherId
-ORDER BY otherId;
-
-
+### cr1
 MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
@@ -55,6 +44,85 @@ length(p)-1 as accountDistance,
 medium.id as mediumId,
 medium.type as mediumType
 ORDER BY accountDistance, otherId, mediumId;
+
+  "operationResult" : [ {
+    "otherId" : 152840912353886323,
+    "accountDistance" : 2,
+    "mediumId" : 43980465155202,
+    "mediumType" : "NFC"
+  }, {
+    "otherId" : 1125899906850268,
+    "accountDistance" : 3,
+    "mediumId" : 13194139617169,
+    "mediumType" : "IPv6"
+  } ]
+
+
+### cr2
+MATCH (p:Person {id:32025})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+(other:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true AND
+head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
+last(getMemberProp(e2, 'timestamp')) > 1627020616747
+WITH DISTINCT other
+MATCH (other)<-[e3:deposit]-(loan:Loan)
+WHERE e3.timestamp > 1627020616747 AND
+e3.timestamp < 1669690342640
+WITH DISTINCT other.id AS otherId, loan.loanAmount AS loanAmount, loan.balance
+AS loanBalance
+WITH otherId AS otherId, sum(loanAmount) as sumLoanAmount, sum(loanBalance) as
+sumLoanBalance
+RETURN otherId, round(sumLoanAmount * 1000) / 1000 as sumLoanAmount,
+round(sumLoanBalance * 1000) / 1000 as sumLoanBalance
+ORDER BY sumLoanAmount DESC, otherId ASC;
+
+  "operationResult" : [ {
+    "otherId" : 4872895071692797812,
+    "sumLoanAmount" : 9.4103294E7,
+    "sumLoanBalance" : 9.4103294E7
+  }, {
+    "otherId" : 4810688826961824290,
+    "sumLoanAmount" : 4.0275519E7,
+    "sumLoanBalance" : 4.0275519E7
+  } ]
+
+### cr5
+MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+WITH src
+MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
+WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
+head(getMemberProp(e2, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e2, 'timestamp')) < 1669690342640
+WITH DISTINCT nodes(p, 'id') as path, length(p) as len
+ORDER BY len DESC
+WHERE hasDuplicates(path)=false
+RETURN path;
+
+  "operationResult" : [ {
+    "path" : [ 4743416582405895609, 4865576722298321633, 4802526327515135661 ]
+  }, {
+    "path" : [ 4743416582405895609, 4865576722298321633, 4878806046203723425 ]
+  }, {
+    "path" : [ 4743416582405895609, 174795960537326727 ]
+  }, {
+    "path" : [ 4743416582405895609, 4865576722298321633 ]
+  }, {
+    "path" : [ 4743416582405895609, 174795960537326727, 297237575406462040 ]
+  } ]
+
+
+### cr11
+MATCH (p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
+maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
+WITH DISTINCT loan
+WITH sum(loan.loanAmount) as sumLoanAmount, count(distinct loan) as numLoans
+RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
+
+  "operationResult" : [ {
+    "sumLoanAmount" : 3.8567769E7,
+    "numLoans" : 1
+  } ]
 
 ( ( {isasc(false,getMemberProp(false,e1,timestamp)) = true} && {head(false,getMemberProp(false,e1,timestamp)) > 90} ) && {last(false,getMemberProp(false,e1,timestamp)) < 120})
 
