@@ -30,6 +30,11 @@ lgraph_server -d restart
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 
 
+MATCH (p:Person {id:32025})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+(other:Account)
+RETURN other;
+
+
 ### cr1
 MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
@@ -118,6 +123,10 @@ maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
 WITH sum(loan.loanAmount) as sumLoanAmount, count(distinct loan) as numLoans
 RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
+
+
+MATCH p=(p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+RETURN p;
 
   "operationResult" : [ {
     "sumLoanAmount" : 3.8567769E7,
