@@ -98,9 +98,19 @@ MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
 WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) > 1627020616747 AND
 last(getMemberProp(e2, 'timestamp')) < 1669690342640
-WITH DISTINCT nodes(p, 'id') as path, length(p) as len
-ORDER BY len DESC
-WHERE hasDuplicates(path)=false
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
+
+MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+WITH src
+MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
+WHERE isAsc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
 RETURN path;
 
   "operationResult" : [ {
@@ -126,7 +136,8 @@ RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
 
 
 MATCH p=(p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
-RETURN p;
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path
+RETURN path;
 
   "operationResult" : [ {
     "sumLoanAmount" : 3.8567769E7,
@@ -143,3 +154,31 @@ lgraph_import -c /root/scripts/import.conf --overwrite 1 \
 1. 调整程序结构，realconsume
 2. dfsstate 加上count，用于记录一个点的邻居数量
 3. 如何取timestamp，参考GetMemberProp实现
+
+
+
+match (n:Account )<-[e:transfer *2..2]-(n2:Account) 
+with n.id as id, count(distinct n2) as cnt1
+match (n:Account )<-[:transfer]-(:Account)<-[:transfer]-(n3:Account)
+with n.id as id, count(distinct n3) as cnt2, cnt1
+where cnt1<>cnt2
+return id, cnt1, cnt2 limit 10;
+
+match (n:Account )<-[e:transfer *2..2]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;
+
+match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;
+
+
+### test
+match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2);
+
+match (n:Account {id:4832081474947659562})<-[e:transfer *2..2]-(n2:Account) return n.id,count(n2);
+
+
+### test
+match (n:Account {id:4832081474947659562})<-[:transfer]-(mid:Account)<-[:transfer]-(n2:Account {id:130323738850760202}) return n.id, n2.id;
+
+match (n:Account {id:4832081474947659562})<-[e:transfer *2..2]-(n2:Account {id:130323738850760202}) return n.id, n2.id;
+
+
+match (n:Account {id:4832081474947659562})<-[e1:transfer]-(mid:Account)<-[e2:transfer]-(n2:Account {id:130323738850760202}) return n.id, e1, mid.id, e2, n2.id;
