@@ -118,7 +118,7 @@ RETURN path;
 [4743416582405895609,4865576722298321633,4687403336918373745]
 
 <!-- where not exec -->
-match p=(scr:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
+match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
 WHERE isAsc(getMemberProp(e, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC
@@ -131,26 +131,15 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false
 RETURN path;
 
-match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
-WHERE isAsc(getMemberProp(e, 'timestamp'))=true
-RETURN src,dst;
-
-match p=(scr:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account)
+match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
 where e1.timestamp < e2.timestamp
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
-match p=(scr:Account {id:4743416582405895609})-[e1:transfer]->(:Account {id:4865576722298321633})-[e2:transfer]->(dst:Account)
-where e1.timestamp < e2.timestamp
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC 
-WHERE hasDuplicates(path)=false 
-RETURN path;
-
-match p=(scr:Account {id:4743416582405895609})-[e1:transfer]->(:Account {id:4865576722298321633})-[e2:transfer]->(dst:Account) 
-RETURN e1.timestamp, e2.timestamp;
+match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(mid:Account {id:4865576722298321633})-[e2:transfer]->(dst:Account {id:4687403336918373745}) 
+RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
 
   "operationResult" : [ {
     "path" : [ 4743416582405895609, 4865576722298321633, 4802526327515135661 ]
