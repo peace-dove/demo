@@ -114,8 +114,11 @@ WHERE hasDuplicates(path)=false
 RETURN path;
 
 
+python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
+
 <!-- two hops -->
 [4743416582405895609,4865576722298321633,4687403336918373745]
+[4743416582405895609,174795960537326727,258112553643682103]
 
 <!-- where not exec -->
 match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
@@ -132,6 +135,12 @@ WHERE hasDuplicates(path)=false
 RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
+match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
 where e1.timestamp < e2.timestamp
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
@@ -139,6 +148,9 @@ WHERE hasDuplicates(path)=false
 RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(mid:Account {id:4865576722298321633})-[e2:transfer]->(dst:Account {id:4687403336918373745}) 
+RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
+
+match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(mid:Account {id:174795960537326727})-[e2:transfer]->(dst:Account {id:258112553643682103}) 
 RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
 
   "operationResult" : [ {
