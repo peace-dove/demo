@@ -17,8 +17,6 @@
 //
 #pragma once
 
-#include <memory>
-#include <utility>
 #include "core/data_type.h"
 #include "cypher/execution_plan/ops/op.h"
 #include "cypher_types.h"
@@ -44,7 +42,7 @@ struct DfsState {
     lgraph::EIter currentEit;
     // level, or path length
     int level;
-
+    // number of neighbors of this node
     int count;
 
     DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
@@ -174,8 +172,6 @@ class IsDescPredicate : public Predicate {
     }
 };
 
-// TODO
-
 class MaxInListPredicate : public Predicate {
  private:
     lgraph::CompareOp op;
@@ -256,23 +252,23 @@ class MinInListPredicate : public Predicate {
 
 /* Variable Length Expand */
 class VarLenExpand : public OpBase {
-    void _InitializeEdgeIter(RTContext *ctx, int64_t vid, lgraph::EIter &eit, size_t &count) {
-        auto &types = relp_->Types();
-        auto iter_type = lgraph::EIter::NA;
-        switch (expand_direction_) {
-        case ExpandTowards::FORWARD:
-            iter_type = types.empty() ? lgraph::EIter::OUT_EDGE : lgraph::EIter::TYPE_OUT_EDGE;
-            break;
-        case ExpandTowards::REVERSED:
-            iter_type = types.empty() ? lgraph::EIter::IN_EDGE : lgraph::EIter::TYPE_IN_EDGE;
-            break;
-        case ExpandTowards::BIDIRECTIONAL:
-            iter_type = types.empty() ? lgraph::EIter::BI_EDGE : lgraph::EIter::BI_TYPE_EDGE;
-            break;
-        }
-        eit.Initialize(ctx->txn_->GetTxn().get(), iter_type, vid, types);
-        count = 1;
-    }
+    // void _InitializeEdgeIter(RTContext *ctx, int64_t vid, lgraph::EIter &eit, size_t &count) {
+    //     auto &types = relp_->Types();
+    //     auto iter_type = lgraph::EIter::NA;
+    //     switch (expand_direction_) {
+    //     case ExpandTowards::FORWARD:
+    //         iter_type = types.empty() ? lgraph::EIter::OUT_EDGE : lgraph::EIter::TYPE_OUT_EDGE;
+    //         break;
+    //     case ExpandTowards::REVERSED:
+    //         iter_type = types.empty() ? lgraph::EIter::IN_EDGE : lgraph::EIter::TYPE_IN_EDGE;
+    //         break;
+    //     case ExpandTowards::BIDIRECTIONAL:
+    //         iter_type = types.empty() ? lgraph::EIter::BI_EDGE : lgraph::EIter::BI_TYPE_EDGE;
+    //         break;
+    //     }
+    //     eit.Initialize(ctx->txn_->GetTxn().get(), iter_type, vid, types);
+    //     count = 1;
+    // }
 
     bool PerNodeLimit(RTContext *ctx, size_t k) {
         return !ctx->per_node_limit_.has_value() ||
@@ -416,7 +412,6 @@ class VarLenExpand : public OpBase {
             // }
 
             if (currentEit.IsValid()) {
-
                 // if (ctx->path_unique_) {
                 //     if (pattern_graph_->VisitedEdges().Contains(currentEit)) {
                 //         currentEit.Next();
@@ -432,9 +427,9 @@ class VarLenExpand : public OpBase {
 
                 stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_);
             } else {
-
                 // if (ctx->path_unique_ && currentPath.Length() != 0) {
-                //     pattern_graph_->VisitedEdges().Erase(currentPath.GetNthEdge(currentPath.Length() - 1));
+                //     pattern_graph_->VisitedEdges().Erase(currentPath.GetNthEdge(currentPath.Length()
+                //     - 1));
                 // }
 
                 stack.pop_back();
@@ -442,12 +437,12 @@ class VarLenExpand : public OpBase {
                     neighbor_->PushVid(currentNodeId);
                     relp_->path_ = currentPath;
 
-                    if (!currentPath.Empty()) {
+                    if (currentPath.Length() != 0) {
                         currentPath.PopBack();
                     }
                     return true;
                 }
-                if (!currentPath.Empty()) {
+                if (currentPath.Length() != 0) {
                     currentPath.PopBack();
                 }
             }
@@ -618,6 +613,11 @@ class VarLenExpand : public OpBase {
         CYPHER_THROW_ASSERT(!children.empty());
         auto child = children[0];
         while (!NextWithFilter(ctx)) {
+            // if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
+            //     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
+            //     continue;
+            // }
+
             auto res = child->Consume(ctx);
             currentPath.Clear();
             relp_->path_.Clear();
@@ -627,12 +627,12 @@ class VarLenExpand : public OpBase {
             }
 
             // init the first of stack
-            lgraph::VertexId start_vid = start_->PullVid();
-            if (start_vid < 0) {
+            lgraph::VertexId startVid = start_->PullVid();
+            if (startVid < 0) {
                 continue;
             }
-            stack.emplace_back(ctx, start_vid, 0, relp_, expand_direction_);
-            currentPath.SetStart(start_vid);
+            stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_);
+            currentPath.SetStart(startVid);
         }
         return OP_OK;
     }
