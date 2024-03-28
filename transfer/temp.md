@@ -129,6 +129,12 @@ WHERE hasDuplicates(path)=false
 RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
+WHERE isAsc(getMemberProp(e, 'timestamp'))=true
+WITH DISTINCT relationships(p) as path, length(p) as len
+ORDER BY len DESC
+RETURN path;
+
+match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC
 WHERE hasDuplicates(path)=false
@@ -216,9 +222,18 @@ match (n:Account {id:4832081474947659562})<-[e:transfer *2..2]-(n2:Account) retu
 
 
 ### test
-match (n:Account {id:4832081474947659562})<-[:transfer]-(mid:Account)<-[:transfer]-(n2:Account {id:130323738850760202}) return n.id, n2.id;
+mid: 4891754170010318768
+
+match (n:Account {id:4832081474947659562})<-[:transfer]-(mid:Account)<-[:transfer]-(n2:Account {id:130323738850760202}) return n.id, mid.id, n2.id;
+
+
+match (n:Account {id:4832081474947659562})<-[e:transfer]-(mid:Account {id:4891754170010318768})
+return e;
+
 
 match (n:Account {id:4832081474947659562})<-[e:transfer *2..2]-(n2:Account {id:130323738850760202}) return n.id, n2.id;
+
+match (n:Account {id:130323738850760202})-[e:transfer *2..2]->(n2:Account {id:4832081474947659562}) return n.id, n2.id;
 
 
 match (n:Account {id:4832081474947659562})<-[e1:transfer]-(mid:Account)<-[e2:transfer]-(n2:Account {id:130323738850760202}) return n.id, e1, mid.id, e2, n2.id;
