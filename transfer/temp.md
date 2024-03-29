@@ -103,6 +103,17 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
+MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+WITH src
+MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
+WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
+head(getMemberProp(e2, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e2, 'timestamp')) < 1669690342640
+WITH DISTINCT nodes(p) as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
 <!-- use this -->
 [4743416582405895609,174795960537326727,297237575406462040]
 
@@ -115,11 +126,11 @@ RETURN path;
 
 MATCH (src:Account {id:4743416582405895609})
 WITH src
-MATCH p=(src:Account)-[e2:transfer*2..2]->(dst:Account)
+MATCH p=(src:Account)-[e2:transfer*1..2]->(dst:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC 
-WHERE hasDuplicates(path)=false 
+ORDER BY len DESC
+WHERE hasDuplicates(path)=false
 RETURN path;
 
 MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)

@@ -56,8 +56,11 @@ struct DfsState {
         }
         if (!isMaxHop) {
             // if max hop, do not init eiter
-            relp->ItsRef()[level].Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
-            currentEit = &relp->ItsRef()[level];
+            (relp->ItsRef()[level]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
+            currentEit = &(relp->ItsRef()[level]);
+            // for debug
+            std::cout << "this is level: " + std::to_string(level) << std::endl;
+            CYPHER_THROW_ASSERT(currentEit->IsValid());
         }
     }
 };
@@ -298,15 +301,13 @@ class VarLenExpand : public OpBase {
                 if (relp_->path_.Length() != 0) {
                     needPop = true;
                 }
-                std::cout << relp_->path_.ToString() << std::endl;
 
                 return true;
             }
 
             if (currentEit->IsValid()) {
                 // check path unique
-                if (ctx->path_unique_ &&
-                    pattern_graph_->VisitedEdges().Contains(currentEit->GetUid())) {
+                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
                     currentEit->Next();
                     continue;
                 } else if (ctx->path_unique_) {
@@ -317,10 +318,7 @@ class VarLenExpand : public OpBase {
 
                 relp_->path_.Append(currentEit->GetUid());  // add edge's euid to path
 
-                // relp_->ItsRef().push_back(std::move(currentEit));  // add currentNodeId's Eit
-                // CYPHER_THROW_ASSERT(currentEit->IsValid());
-
-                // currentNodeId's iter, needNext = true
+                // set currentNodeId's eiter's needNext to true
                 needNext = true;
                 stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_, false,
                                    currentLevel + 1 == max_hop_);
@@ -348,6 +346,19 @@ class VarLenExpand : public OpBase {
                     if (relp_->path_.Length() != 0) {
                         needPop = true;
                     }
+                    // for debug
+                    size_t len = 0;
+                    for (auto &eit : relp_->ItsRef()) {
+                        if (!eit.IsValid()) {
+                            break;
+                        }
+                        len++;
+                    }
+                    std::cout << currentNodeId << std::endl;
+                    std::cout << currentLevel << std::endl;
+                    std::cout << len << std::endl;
+                    std::cout << relp_->path_.ToString() << std::endl;
+                    CYPHER_THROW_ASSERT(len == relp_->path_.Length());
 
                     return true;
                 }
@@ -377,7 +388,7 @@ class VarLenExpand : public OpBase {
 
     // stack for DFS
     std::vector<DfsState> stack;
-    
+
     // this flag decides whether need to pop relp_->Path
     bool needPop = false;
 
