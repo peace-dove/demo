@@ -103,11 +103,27 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
+<!-- use this -->
+[4743416582405895609,174795960537326727,297237575406462040]
 
-MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
+MATCH (src:Account {id:4743416582405895609})
 WITH src
-MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
-WHERE isAsc(getMemberProp(e2, 'timestamp'))=true
+MATCH p=(src:Account)-[e2:transfer*2..2]->(dst:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
 WHERE hasDuplicates(path)=false 
@@ -121,7 +137,7 @@ python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgr
 [4743416582405895609,174795960537326727,258112553643682103]
 
 <!-- where not exec -->
-match p=(src:Account {id:4743416582405895609})-[e:transfer*1..2]->(dst:Account)
+match p=(src:Account {id:4743416582405895609})-[e:transfer*3..3]->(dst:Account)
 WHERE isAsc(getMemberProp(e, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC
@@ -192,6 +208,10 @@ maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
 WITH sum(loan.loanAmount) as sumLoanAmount, count(distinct loan) as numLoans
 RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
+
+MATCH (p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person)
+WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747
+RETURN p1;
 
 
 MATCH p=(p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
