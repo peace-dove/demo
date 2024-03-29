@@ -129,6 +129,7 @@ WHERE hasDuplicates(path)=false
 RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account {id:4687403336918373745})
+WHERE isAsc(getMemberProp(e, 'timestamp'))=true
 WITH DISTINCT relationships(p) as path, length(p) as len
 ORDER BY len DESC
 RETURN path;
@@ -140,6 +141,13 @@ RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+ORDER BY len DESC
+WHERE hasDuplicates(path)=false
+RETURN path;
+
+match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account {id:4687403336918373745})
+WHERE isAsc(getMemberProp(e, 'timestamp'))=true
+WITH DISTINCT nodes(p) as path, length(p) as len
 ORDER BY len DESC
 WHERE hasDuplicates(path)=false
 RETURN path;
@@ -198,9 +206,6 @@ RETURN path;
 ( ( {isasc(false,getMemberProp(false,e1,timestamp)) = true} && {head(false,getMemberProp(false,e1,timestamp)) > 90} ) && {last(false,getMemberProp(false,e1,timestamp)) < 120})
 
 
-lgraph_import -c /root/scripts/import.conf --overwrite 1 \
-    --dir /root/lgraph_db_sf1 --delimiter "|" --v3 0
-
 
 1. 调整程序结构，realconsume
 2. dfsstate 加上count，用于记录一个点的邻居数量
@@ -215,6 +220,7 @@ with n.id as id, count(distinct n3) as cnt2, cnt1
 where cnt1<>cnt2
 return id, cnt1, cnt2 limit 10;
 
+<!-- time limit -->
 match (n:Account )<-[e:transfer *2..2]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;
 
 match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;

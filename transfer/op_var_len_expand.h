@@ -21,6 +21,7 @@
 #include "cypher/execution_plan/ops/op.h"
 #include "cypher_types.h"
 #include "filter/filter.h"
+#include "filter/iterator.h"
 
 namespace cypher {
 
@@ -248,15 +249,18 @@ class VarLenExpand : public OpBase {
 
     bool NextWithFilter(RTContext *ctx) {
         while (!stack.empty()) {
+            if (needPop) {
+                relp_->path_.PopBack();
+            }
             auto &currentState = stack.back();
             auto currentNodeId = currentState.currentNodeId;
             auto &currentEit = currentState.currentEit;
             auto currentLevel = currentState.level;
 
             if (currentLevel == max_hop_) {
-                if (ctx->path_unique_ && currentPath.Length() != 0) {
+                if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                     CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
-                        currentPath.GetNthEdge(currentPath.Length() - 1)));
+                        relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
                 }
 
                 stack.pop_back();
@@ -265,22 +269,26 @@ class VarLenExpand : public OpBase {
                 // label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                    if (currentPath.Length() != 0) {
-                        currentPath.PopBack();
+                    if (relp_->path_.Length() != 0) {
+                        relp_->path_.PopBack();
                     }
                     continue;
                 }
 
-                relp_->path_ = currentPath;
+                // relp_->path_ = currentPath;
 
-                if (currentPath.Length() != 0) {
-                    currentPath.PopBack();
+                // if (currentPath.Length() != 0) {
+                //     currentPath.PopBack();
+                // }
+                if (relp_->path_.Length() != 0) {
+                    needPop = true;
                 }
+
                 return true;
             }
 
             if (currentEit.IsValid()) {
-                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(currentEit)) {
+                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(currentEit.GetUid())) {
                     currentEit.Next();
                     continue;
                 } else if (ctx->path_unique_) {
@@ -288,15 +296,15 @@ class VarLenExpand : public OpBase {
                 }
 
                 auto neighbor = currentEit.GetNbr(expand_direction_);
-                currentPath.Append(currentEit.GetUid());
+                relp_->path_.Append(currentEit.GetUid());
 
                 currentEit.Next();
 
                 stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_);
             } else {
-                if (ctx->path_unique_ && currentPath.Length() != 0) {
+                if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                     CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
-                        currentPath.GetNthEdge(currentPath.Length() - 1)));
+                        relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
                 }
 
                 stack.pop_back();
@@ -306,21 +314,25 @@ class VarLenExpand : public OpBase {
                     // label
                     if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                         neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                        if (currentPath.Length() != 0) {
-                            currentPath.PopBack();
+                        if (relp_->path_.Length() != 0) {
+                            relp_->path_.PopBack();
                         }
                         continue;
                     }
 
-                    relp_->path_ = currentPath;
+                    // relp_->path_ = currentPath;
 
-                    if (currentPath.Length() != 0) {
-                        currentPath.PopBack();
+                    // if (currentPath.Length() != 0) {
+                    //     currentPath.PopBack();
+                    // }
+                    if (relp_->path_.Length() != 0) {
+                        needPop = true;
                     }
+
                     return true;
                 }
-                if (currentPath.Length() != 0) {
-                    currentPath.PopBack();
+                if (relp_->path_.Length() != 0) {
+                    relp_->path_.PopBack();
                 }
             }
         }
@@ -344,7 +356,9 @@ class VarLenExpand : public OpBase {
 
     // stack for DFS, current path is currentPath
     std::vector<DfsState> stack;
-    Path currentPath;
+    std::vector<lgraph::EIter> currentIts;
+    // Path currentPath;
+    bool needPop = false;
 
     // keep predicates
     std::vector<std::unique_ptr<Predicate>> predicates;
@@ -448,16 +462,10 @@ class VarLenExpand : public OpBase {
         CYPHER_THROW_ASSERT(!children.empty());
         auto child = children[0];
         while (!NextWithFilter(ctx)) {
-            // if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
-            //     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-            //     continue;
-            // }
-
             auto res = child->Consume(ctx);
-            currentPath.Clear();
+            // currentPath.Clear();
             relp_->path_.Clear();
             if (res != OP_OK) {
-                // state_ = Uninitialized;
                 return res;
             }
 
@@ -468,14 +476,16 @@ class VarLenExpand : public OpBase {
             }
             CYPHER_THROW_ASSERT(stack.empty());
             stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_);
-            currentPath.SetStart(startVid);
+            relp_->path_.SetStart(startVid);
+            // currentPath.SetStart(startVid);
         }
         return OP_OK;
     }
 
     OpResult ResetImpl(bool complete) override {
         stack.clear();
-        currentPath.Clear();
+        // currentPath.Clear();
+        relp_->path_.Clear();
         // std::queue<lgraph::VertexId>().swap(frontier_buffer_);
         // std::queue<Path>().swap(path_buffer_);
         // TODO(anyone) reset modifies
