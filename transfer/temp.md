@@ -243,8 +243,12 @@ match (n:Account {id:130323738850760202})-[e:transfer *2..2]->(n2:Account {id:48
 
 match (n:Account {id:4832081474947659562})<-[e1:transfer]-(mid:Account)<-[e2:transfer]-(n2:Account {id:130323738850760202}) return n.id, e1, mid.id, e2, n2.id;
 
+
+3.28 总结
 从边迭代器取到的边，tid非零。Path在append是没有处理这个数据，导致后续该项为0.
 
 common.h Path中加入tids_
 
 Path中tids_改回来，在contains使用的时候强行置为0
+
+iterator.h 有两处修改
