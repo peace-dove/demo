@@ -19,6 +19,7 @@
 
 #include "core/data_type.h"
 #include "cypher/execution_plan/ops/op.h"
+#include "cypher_exception.h"
 #include "cypher_types.h"
 #include "filter/filter.h"
 #include "filter/iterator.h"
@@ -29,15 +30,17 @@ struct DfsState {
     // current node id
     lgraph::VertexId currentNodeId;
     // current index for current node
-    lgraph::EIter currentEit;
+    lgraph::EIter *currentEit;
     // level, or path length
     int level;
     // number of neighbors of this node
     int count;
+    // whether the eiter need Next()
+    bool needNext;
 
     DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
-             ExpandTowards expand_direction)
-        : currentNodeId(id), level(level), count(0) {
+             ExpandTowards expand_direction, bool needNext, bool isMaxHop)
+        : currentNodeId(id), level(level), count(0), needNext(needNext) {
         auto &types = relp->Types();
         auto iter_type = lgraph::EIter::NA;
         switch (expand_direction) {
@@ -51,7 +54,11 @@ struct DfsState {
             iter_type = types.empty() ? lgraph::EIter::BI_EDGE : lgraph::EIter::BI_TYPE_EDGE;
             break;
         }
-        currentEit.Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
+        if (!isMaxHop) {
+            // if max hop, do not init eiter
+            relp->ItsRef()[level].Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
+            currentEit = &relp->ItsRef()[level];
+        }
     }
 };
 
@@ -251,13 +258,25 @@ class VarLenExpand : public OpBase {
         while (!stack.empty()) {
             if (needPop) {
                 relp_->path_.PopBack();
+                // relp_->ItsRef().pop_back();
+                needPop = false;
             }
             auto &currentState = stack.back();
             auto currentNodeId = currentState.currentNodeId;
             auto &currentEit = currentState.currentEit;
             auto currentLevel = currentState.level;
 
+            auto &needNext = currentState.needNext;
+
+            // if currentNodeId's needNext = true, currentEit.next()
+            // then set needNext = false
+            if (needNext) {
+                currentEit->Next();
+                needNext = false;
+            }
+
             if (currentLevel == max_hop_) {
+                // check path unique
                 if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                     CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
                         relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
@@ -266,42 +285,47 @@ class VarLenExpand : public OpBase {
                 stack.pop_back();
                 neighbor_->PushVid(currentNodeId);
 
-                // label
+                // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
                     if (relp_->path_.Length() != 0) {
                         relp_->path_.PopBack();
+                        // relp_->ItsRef().pop_back();
                     }
                     continue;
                 }
 
-                // relp_->path_ = currentPath;
-
-                // if (currentPath.Length() != 0) {
-                //     currentPath.PopBack();
-                // }
                 if (relp_->path_.Length() != 0) {
                     needPop = true;
                 }
+                std::cout << relp_->path_.ToString() << std::endl;
 
                 return true;
             }
 
-            if (currentEit.IsValid()) {
-                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(currentEit.GetUid())) {
-                    currentEit.Next();
+            if (currentEit->IsValid()) {
+                // check path unique
+                if (ctx->path_unique_ &&
+                    pattern_graph_->VisitedEdges().Contains(currentEit->GetUid())) {
+                    currentEit->Next();
                     continue;
                 } else if (ctx->path_unique_) {
-                    pattern_graph_->VisitedEdges().Add(currentEit);
+                    pattern_graph_->VisitedEdges().Add(*currentEit);
                 }
 
-                auto neighbor = currentEit.GetNbr(expand_direction_);
-                relp_->path_.Append(currentEit.GetUid());
+                auto neighbor = currentEit->GetNbr(expand_direction_);
 
-                currentEit.Next();
+                relp_->path_.Append(currentEit->GetUid());  // add edge's euid to path
 
-                stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_);
+                // relp_->ItsRef().push_back(std::move(currentEit));  // add currentNodeId's Eit
+                // CYPHER_THROW_ASSERT(currentEit->IsValid());
+
+                // currentNodeId's iter, needNext = true
+                needNext = true;
+                stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_, false,
+                                   currentLevel + 1 == max_hop_);
             } else {
+                // check unique
                 if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                     CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
                         relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
@@ -311,20 +335,16 @@ class VarLenExpand : public OpBase {
                 if (currentLevel >= min_hop_) {
                     neighbor_->PushVid(currentNodeId);
 
-                    // label
+                    // check label
                     if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                         neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
                         if (relp_->path_.Length() != 0) {
                             relp_->path_.PopBack();
+                            // relp_->ItsRef().pop_back();
                         }
                         continue;
                     }
 
-                    // relp_->path_ = currentPath;
-
-                    // if (currentPath.Length() != 0) {
-                    //     currentPath.PopBack();
-                    // }
                     if (relp_->path_.Length() != 0) {
                         needPop = true;
                     }
@@ -333,6 +353,7 @@ class VarLenExpand : public OpBase {
                 }
                 if (relp_->path_.Length() != 0) {
                     relp_->path_.PopBack();
+                    // relp_->ItsRef().pop_back();
                 }
             }
         }
@@ -354,10 +375,10 @@ class VarLenExpand : public OpBase {
     // temp used
     std::shared_ptr<lgraph::Filter> edge_filter_ = nullptr;
 
-    // stack for DFS, current path is currentPath
+    // stack for DFS
     std::vector<DfsState> stack;
-    std::vector<lgraph::EIter> currentIts;
-    // Path currentPath;
+    
+    // this flag decides whether need to pop relp_->Path
     bool needPop = false;
 
     // keep predicates
@@ -454,7 +475,7 @@ class VarLenExpand : public OpBase {
         record->values[nbr_rec_idx_].node = neighbor_;
         record->values[relp_rec_idx_].type = Entry::VAR_LEN_RELP;
         record->values[relp_rec_idx_].relationship = relp_;
-
+        relp_->ItsRef().resize(max_hop_);
         return OP_OK;
     }
 
@@ -463,29 +484,26 @@ class VarLenExpand : public OpBase {
         auto child = children[0];
         while (!NextWithFilter(ctx)) {
             auto res = child->Consume(ctx);
-            // currentPath.Clear();
             relp_->path_.Clear();
             if (res != OP_OK) {
                 return res;
             }
-
             // init the first of stack
             lgraph::VertexId startVid = start_->PullVid();
             if (startVid < 0) {
                 continue;
             }
             CYPHER_THROW_ASSERT(stack.empty());
-            stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_);
+            stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_, false, !max_hop_);
             relp_->path_.SetStart(startVid);
-            // currentPath.SetStart(startVid);
         }
         return OP_OK;
     }
 
     OpResult ResetImpl(bool complete) override {
         stack.clear();
-        // currentPath.Clear();
         relp_->path_.Clear();
+        relp_->ItsRef().clear();
         // std::queue<lgraph::VertexId>().swap(frontier_buffer_);
         // std::queue<Path>().swap(path_buffer_);
         // TODO(anyone) reset modifies

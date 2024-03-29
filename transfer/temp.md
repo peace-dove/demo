@@ -121,7 +121,7 @@ python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgr
 [4743416582405895609,174795960537326727,258112553643682103]
 
 <!-- where not exec -->
-match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account)
+match p=(src:Account {id:4743416582405895609})-[e:transfer*1..2]->(dst:Account)
 WHERE isAsc(getMemberProp(e, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC
