@@ -19,7 +19,6 @@
 #pragma once
 
 #include "cypher/execution_plan/ops/op.h"
-#include "cypher_types.h"
 #include "filter/filter.h"
 
 namespace cypher {
@@ -49,47 +48,12 @@ class HeadPredicate : public Predicate {
  private:
     // operator
     lgraph::CompareOp op;
-    // operand
+    // operand, on the right
     FieldData operand;
 
  public:
     HeadPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
-    bool eval(std::vector<lgraph::EIter> &eits) {
-        auto ret = FieldData::Array(0);
-        // get first edge's timestamp, check whether it fits the condition
-        for (auto &eit : eits) {
-            if (eit.IsValid()) {
-                ret.array->emplace_back(FieldData(eit.GetField("timestamps")));
-            }
-        }
-        if (ret.array->empty()) {
-            return true;
-        }
-        FieldData head = FieldData(ret.array->front());
-        switch (op) {
-        case lgraph::CompareOp::LBR_GT:
-            return head > operand;
-            break;
-        case lgraph::CompareOp::LBR_GE:
-            return head >= operand;
-            break;
-        case lgraph::CompareOp::LBR_LT:
-            return head < operand;
-            break;
-        case lgraph::CompareOp::LBR_LE:
-            return head <= operand;
-            break;
-        case lgraph::CompareOp::LBR_EQ:
-            return head == operand;
-            break;
-        case lgraph::CompareOp::LBR_NEQ:
-            return head != operand;
-            break;
-        default:
-            break;
-        }
-        return false;
-    }
+    bool eval(std::vector<lgraph::EIter> &eits) override;
 };
 
 // class LastPredicate : public Predicate {

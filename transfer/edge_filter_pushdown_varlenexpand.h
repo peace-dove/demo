@@ -13,7 +13,7 @@
  */
 
 /*
- * Created on 3/25/23
+ * Created by bxj on 3/25/23
  */
 #pragma once
 
@@ -37,19 +37,24 @@ namespace cypher {
  */
 class EdgeFilterPushdownVarLenExpand : public OptPass {
     void _AddEdgeFilterOp(OpFilter *&op_filter, VarLenExpand *&op_varlenexpand) {
-        // add edge_filter
+        std::cout << "add edge filter" << std::endl;
+
         auto filter = op_filter->filter_;
         op_varlenexpand->PushDownEdgeFilter(filter);
         auto op_post = op_filter->parent;
-        for (auto i = op_post->children.begin(); i != op_post->children.end(); i++) {
-            if (*i == op_filter) {
-                op_post->RemoveChild(op_filter);
-                op_post->InsertChild(i, op_filter->children[0]);
-                delete op_filter;
-                op_filter = nullptr;
-                break;
-            }
-        }
+        auto filter_pos = std::find(op_post->children.begin(), op_post->children.end(), op_filter);
+        delete op_post->ReplaceChild(filter_pos, op_varlenexpand);
+        op_filter = nullptr;
+
+        // for (auto i = op_post->children.begin(); i != op_post->children.end(); i++) {
+        //     if (*i == op_filter) {
+        //         op_post->RemoveChild(op_filter);
+        //         op_post->InsertChild(i, op_filter->children[0]);
+        //         delete op_filter;
+        //         op_filter = nullptr;
+        //         break;
+        //     }
+        // }
     }
 
     bool _FindEdgeFilter(OpBase *root, OpFilter *&op_filter, VarLenExpand *&op_varlenexpand) {
@@ -58,22 +63,14 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
             op->children[0]->type == OpType::VAR_LEN_EXPAND) {
             op_filter = dynamic_cast<OpFilter *>(op);
             op_varlenexpand = dynamic_cast<VarLenExpand *>(op->children[0]);
-            // if filter on edge
+            // if exist filter on var len edge
             std::string edge_alias = op_varlenexpand->relp_->Alias();
-            std::string src_alias = op_varlenexpand->start_->Alias();
-            std::string neigh_alias = op_varlenexpand->neighbor_->Alias();
 
             std::set<std::string> ret = op_filter->filter_->Alias();
-            // adjust edge filter when filter tree contains sub-filter whose alias are completed
-            // contained by {src_alias, edge_alias} e.g. (ns)-[r]->(ne): sub-filter has alias only
-            // have ns, r or both.
-            //   `ns.name = r.role AND r.role = ne.name`, `r.role = "Iron Man"`....
-            //
-            // If filter contains binary type logical op (i.e AND, OR, XOR...), only care about AND
-            // case. It will split filter when containing other binary type logical op.
+
             if (op_filter->filter_->ContainAlias({edge_alias}) &&
                 op_filter->filter_->BinaryOnlyContainsAND()) {
-                // if filter has both edge_filter and node_filter, split filters
+                // if filter has edge_filter, split filters
                 auto clone_filter = op_filter->filter_->Clone();
 
                 // collect filters which only contains edge_alias
@@ -94,21 +91,22 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
                                                          return false;
                                                      });
 
-                // split into two filters only when both are not nullptr
+                // split into two filters
                 if (clone_filter && op_filter->filter_) {
                     auto op_node_filter = new OpFilter(clone_filter);
                     op_node_filter->AddChild(op_filter->children[0]);
                     op_filter->RemoveChild(op_filter->children[0]);
                     op_filter->AddChild(op_node_filter);
                 } else if (clone_filter) {
-                    // if the op_filter becomes null, delete it
+                    // if the op_filter is null, delete it
                     auto op_node_filter = new OpFilter(clone_filter);
                     op_node_filter->AddChild(op_filter->children[0]);
                     op_filter->RemoveChild(op_filter->children[0]);
                     op_filter->AddChild(op_node_filter);
 
                     auto op_post = op_filter->parent;
-                    auto filter_pos = std::find(op_post->children.begin(), op_post->children.end(), op_filter);
+                    auto filter_pos =
+                        std::find(op_post->children.begin(), op_post->children.end(), op_filter);
                     delete op_post->ReplaceChild(filter_pos, op_node_filter);
                     op_filter = op_node_filter;
                 }
@@ -136,6 +134,7 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
     bool Gate() override { return true; }
 
     int Execute(OpBase *root) override {
+        std::cout << "in rule var len edge filter" << std::endl;
         _AdjustFilter(root);
         return 0;
     }

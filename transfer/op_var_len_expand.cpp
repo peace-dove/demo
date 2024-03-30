@@ -18,8 +18,6 @@
 //
 
 #include "cypher/execution_plan/ops/op_var_len_expand.h"
-#include <memory>
-#include "cypher_types.h"
 
 namespace cypher {
 
@@ -44,6 +42,37 @@ DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relat
         (relp->ItsRef()[level]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
         currentEit = &(relp->ItsRef()[level]);
     }
+}
+
+bool HeadPredicate::eval(std::vector<lgraph::EIter> &eits) {
+    auto ret = cypher::FieldData::Array(0);
+    // get first edge's timestamp, check whether it fits the condition
+    for (auto &eit : eits) {
+        if (eit.IsValid()) {
+            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
+        }
+    }
+    if (ret.array->empty()) {
+        return true;
+    }
+    FieldData head = FieldData(ret.array->front());
+    switch (op) {
+    case lgraph::CompareOp::LBR_GT:
+        return head > operand;
+    case lgraph::CompareOp::LBR_GE:
+        return head >= operand;
+    case lgraph::CompareOp::LBR_LT:
+        return head < operand;
+    case lgraph::CompareOp::LBR_LE:
+        return head <= operand;
+    case lgraph::CompareOp::LBR_EQ:
+        return head == operand;
+    case lgraph::CompareOp::LBR_NEQ:
+        return head != operand;
+    default:
+        break;
+    }
+    return false;
 }
 
 bool VarLenExpand::PerNodeLimit(RTContext *ctx, size_t count) {
@@ -126,7 +155,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                                currentLevel + 1 == max_hop_);
 
             // check predicates here
-            for (auto& p: predicates) {
+            for (auto &p : predicates) {
                 if (!p->eval(relp_->ItsRef())) {
                     stack.pop_back();
                     relp_->path_.PopBack();
@@ -244,6 +273,7 @@ void VarLenExpand::PushDownEdgeFilter(std::shared_ptr<lgraph::Filter> edge_filte
     edge_filter_ = edge_filter;
     // add filter to local Predicates
     PushFilter(edge_filter);
+    std::cout << "filter" << std::endl;
 }
 
 OpBase::OpResult VarLenExpand::Initialize(RTContext *ctx) {

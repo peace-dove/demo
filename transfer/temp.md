@@ -114,47 +114,34 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
-<!-- use this -->
+#### test head
 [4743416582405895609,174795960537326727,297237575406462040]
 
 MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)
-WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
+WHERE head(getMemberProp(e2, 'timestamp')) > 1627020616747
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
-MATCH (src:Account {id:4743416582405895609})
-WITH src
-MATCH p=(src:Account)-[e2:transfer*2..2]->(dst:Account)
-WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC
-WHERE hasDuplicates(path)=false
-RETURN path;
-
-MATCH (src:Account {id:4743416582405895609})
-WITH src
-MATCH p=(src:Account)-[e2:transfer*1..2]->(dst:Account)
-WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
-WITH DISTINCT nodes(p) as path, length(p) as len
-ORDER BY len DESC
-WHERE hasDuplicates(path)=false
-RETURN path;
-
-MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*1..2]->(dst:Account)
-WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC 
-WHERE hasDuplicates(path)=false 
-RETURN path;
-
-MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*1..2]->(dst:Account)
-WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
-WITH DISTINCT relationships(p) as path, length(p) as len
+<!-- use this -->
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account {id:4687403336918373745})
+WHERE head(getMemberProp(e2, 'timestamp')) > 1662123596189
+WITH relationships(p) as path, length(p) as len
 ORDER BY len DESC 
 RETURN path;
 
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account {id:4687403336918373745})
+WITH relationships(p) as path, length(p) as len
+ORDER BY len DESC 
+RETURN path;
+
+match (src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
+where e1.timestamp > 1662123596189
+RETURN e1.timestamp, e2.timestamp;
+
+match (src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
+RETURN e1.timestamp, e2.timestamp;
 
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 
