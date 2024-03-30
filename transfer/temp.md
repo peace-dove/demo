@@ -117,7 +117,7 @@ RETURN path;
 <!-- use this -->
 [4743416582405895609,174795960537326727,297237575406462040]
 
-MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*1..2]->(dst:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
@@ -133,11 +133,26 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false
 RETURN path;
 
-MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account)
+MATCH (src:Account {id:4743416582405895609})
+WITH src
+MATCH p=(src:Account)-[e2:transfer*1..2]->(dst:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT nodes(p) as path, length(p) as len
+ORDER BY len DESC
+WHERE hasDuplicates(path)=false
+RETURN path;
+
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*1..2]->(dst:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
 WHERE hasDuplicates(path)=false 
+RETURN path;
+
+MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*1..2]->(dst:Account)
+WHERE isDesc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT relationships(p) as path, length(p) as len
+ORDER BY len DESC 
 RETURN path;
 
 
@@ -241,21 +256,6 @@ RETURN path;
 1. 调整程序结构，realconsume
 2. dfsstate 加上count，用于记录一个点的邻居数量
 3. 如何取timestamp，参考GetMemberProp实现
-
-
-
-match (n:Account )<-[e:transfer *2..2]-(n2:Account) 
-with n.id as id, count(distinct n2) as cnt1
-match (n:Account )<-[:transfer]-(:Account)<-[:transfer]-(n3:Account)
-with n.id as id, count(distinct n3) as cnt2, cnt1
-where cnt1<>cnt2
-return id, cnt1, cnt2 limit 10;
-
-<!-- time limit -->
-match (n:Account )<-[e:transfer *2..2]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;
-
-match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2) as cnt order by cnt desc limit 10;
-
 
 ### test
 match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2);
