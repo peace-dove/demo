@@ -41,8 +41,6 @@ DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relat
         // if max hop, do not init eiter
         (relp->ItsRef()[level]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
         currentEit = &(relp->ItsRef()[level]);
-        // for debug
-        std::cout << "id: " + std::to_string(id) + ", level: " + std::to_string(level) << std::endl;
     }
 }
 
@@ -58,10 +56,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto currentLevel = currentState.level;
 
         auto &needNext = currentState.needNext;
-
-        std::cout << "node: " + std::to_string(currentNodeId) +
-                         ", this is level: " + std::to_string(currentLevel)
-                  << std::endl;
 
         // if currentNodeId's needNext = true, currentEit.next()
         // then set needNext = false
@@ -82,7 +76,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             // check label
             if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                 neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                std::cout << "label: " + neighbor_->Label() << std::endl;
                 if (relp_->path_.Length() != 0) {
                     relp_->path_.PopBack();
                 }
@@ -92,29 +85,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             if (relp_->path_.Length() != 0) {
                 needPop = true;
             }
-            CYPHER_THROW_ASSERT(relp_->ItsRef()[0].IsValid());
-            CYPHER_THROW_ASSERT(relp_->ItsRef()[1].IsValid());
-
-            // for debug
-            size_t len = 0;
-            for (int i = 0; i < max_hop_; i++) {
-                if (relp_->ItsRef()[len].IsValid()) {
-                    len++;
-                } else {
-                    break;
-                }
-            }
-            // for (auto &eit : relp_->ItsRef()) {
-            //     if (!eit.IsValid()) {
-            //         break;
-            //     }
-            //     len++;
-            // }
-            std::cout << currentNodeId << std::endl;
-            std::cout << currentLevel << std::endl;
-            std::cout << len << std::endl;
-            std::cout << relp_->path_.ToString() << std::endl;
-            CYPHER_THROW_ASSERT(len == relp_->path_.Length());
 
             return true;
         }
@@ -159,20 +129,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 if (relp_->path_.Length() != 0) {
                     needPop = true;
                 }
-                // for debug
-                size_t len = 0;
-                for (int i = 0; i < max_hop_; i++) {
-                    if (relp_->ItsRef()[len].IsValid()) {
-                        len++;
-                    } else {
-                        break;
-                    }
-                }
-                std::cout << currentNodeId << std::endl;
-                std::cout << currentLevel << std::endl;
-                std::cout << len << std::endl;
-                std::cout << relp_->path_.ToString() << std::endl;
-                CYPHER_THROW_ASSERT(len == relp_->path_.Length());
 
                 return true;
             }
@@ -295,7 +251,6 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         }
         CYPHER_THROW_ASSERT(stack.empty());
         stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_, false, !max_hop_);
-        CYPHER_THROW_ASSERT(relp_->ItsRef()[0].IsValid());
         relp_->path_.SetStart(startVid);
     }
     return OP_OK;
@@ -304,7 +259,7 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
 OpBase::OpResult VarLenExpand::ResetImpl(bool complete) {
     stack.clear();
     relp_->path_.Clear();
-    relp_->ItsRef().clear();
+
     // std::queue<lgraph::VertexId>().swap(frontier_buffer_);
     // std::queue<Path>().swap(path_buffer_);
     // TODO(anyone) reset modifies
