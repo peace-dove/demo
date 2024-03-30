@@ -23,6 +23,7 @@
 
 namespace cypher {
 /*
+ * TODO
  * EdgeFilterPushdownExpand:
  * MATCH (n)-[hascreator:postHasCreator]->(m) WHERE hascreator.creationDate < 20111217 RETURN n;
  * MATCH (n)-[hascreator:postHasCreator]->(m) WHERE hascreator.creationDate < 20111217 AND m.id >
@@ -37,24 +38,18 @@ namespace cypher {
  */
 class EdgeFilterPushdownVarLenExpand : public OptPass {
     void _AddEdgeFilterOp(OpFilter *&op_filter, VarLenExpand *&op_varlenexpand) {
-        std::cout << "add edge filter" << std::endl;
-
         auto filter = op_filter->filter_;
         op_varlenexpand->PushDownEdgeFilter(filter);
         auto op_post = op_filter->parent;
-        auto filter_pos = std::find(op_post->children.begin(), op_post->children.end(), op_filter);
-        delete op_post->ReplaceChild(filter_pos, op_varlenexpand);
-        op_filter = nullptr;
-
-        // for (auto i = op_post->children.begin(); i != op_post->children.end(); i++) {
-        //     if (*i == op_filter) {
-        //         op_post->RemoveChild(op_filter);
-        //         op_post->InsertChild(i, op_filter->children[0]);
-        //         delete op_filter;
-        //         op_filter = nullptr;
-        //         break;
-        //     }
-        // }
+        for (auto i = op_post->children.begin(); i != op_post->children.end(); i++) {
+            if (*i == op_filter) {
+                op_post->RemoveChild(op_filter);
+                op_post->InsertChild(i, op_filter->children[0]);
+                delete op_filter;
+                op_filter = nullptr;
+                break;
+            }
+        }
     }
 
     bool _FindEdgeFilter(OpBase *root, OpFilter *&op_filter, VarLenExpand *&op_varlenexpand) {
@@ -74,41 +69,32 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
                 auto clone_filter = op_filter->filter_->Clone();
 
                 // collect filters which only contains edge_alias
-                clone_filter->RemoveFilterWhen(clone_filter,
-                                               [&edge_alias](const auto &b, const auto &e) {
-                                                   for (auto it = b; it != e; it++) {
-                                                       if (*it == edge_alias) return false;
-                                                   }
-                                                   return true;
-                                               });
-
-                // collect filter which not contain edge_alias
+                // e.g. head(getMemberProp(e2, 'timestamp')) > 1662123596189
                 op_filter->filter_->RemoveFilterWhen(op_filter->filter_,
                                                      [&edge_alias](const auto &b, const auto &e) {
                                                          for (auto it = b; it != e; it++) {
-                                                             if (*it == edge_alias) return true;
+                                                             if (*it == edge_alias) return false;
                                                          }
-                                                         return false;
+                                                         return true;
                                                      });
+
+                // collect filter which not contain edge_alias
+                // e.g. {dst.id = 4687403336918373745}
+                clone_filter->RemoveFilterWhen(clone_filter,
+                                               [&edge_alias](const auto &b, const auto &e) {
+                                                   for (auto it = b; it != e; it++) {
+                                                       if (*it == edge_alias) return true;
+                                                   }
+                                                   return false;
+                                               });
 
                 // split into two filters
                 if (clone_filter && op_filter->filter_) {
-                    auto op_node_filter = new OpFilter(clone_filter);
-                    op_node_filter->AddChild(op_filter->children[0]);
+                    // op_filter -> op_no_edge_filter -> varlenexpand
+                    auto op_no_edge_filter = new OpFilter(clone_filter);
+                    op_no_edge_filter->AddChild(op_filter->children[0]);
                     op_filter->RemoveChild(op_filter->children[0]);
-                    op_filter->AddChild(op_node_filter);
-                } else if (clone_filter) {
-                    // if the op_filter is null, delete it
-                    auto op_node_filter = new OpFilter(clone_filter);
-                    op_node_filter->AddChild(op_filter->children[0]);
-                    op_filter->RemoveChild(op_filter->children[0]);
-                    op_filter->AddChild(op_node_filter);
-
-                    auto op_post = op_filter->parent;
-                    auto filter_pos =
-                        std::find(op_post->children.begin(), op_post->children.end(), op_filter);
-                    delete op_post->ReplaceChild(filter_pos, op_node_filter);
-                    op_filter = op_node_filter;
+                    op_filter->AddChild(op_no_edge_filter);
                 }
                 return true;
             }
@@ -134,7 +120,6 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
     bool Gate() override { return true; }
 
     int Execute(OpBase *root) override {
-        std::cout << "in rule var len edge filter" << std::endl;
         _AdjustFilter(root);
         return 0;
     }

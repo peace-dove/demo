@@ -114,6 +114,15 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
+MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+WITH src
+MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
+WHERE isAsc(getMemberProp(e2, 'timestamp'))=true
+WITH DISTINCT nodes(p) as path, length(p) as len
+ORDER BY len DESC 
+WHERE hasDuplicates(path)=false 
+RETURN path;
+
 #### test head
 [4743416582405895609,174795960537326727,297237575406462040]
 
@@ -126,7 +135,7 @@ RETURN path;
 
 <!-- use this -->
 MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account {id:4687403336918373745})
-WHERE head(getMemberProp(e2, 'timestamp')) > 1662123596189
+WHERE last(getMemberProp(e2, 'timestamp')) > 1659331936801
 WITH relationships(p) as path, length(p) as len
 ORDER BY len DESC 
 RETURN path;
@@ -142,6 +151,13 @@ RETURN e1.timestamp, e2.timestamp;
 
 match (src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
 RETURN e1.timestamp, e2.timestamp;
+
++----+---------------+---------------+
+| id | e1.timestamp  | e2.timestamp  |
++----+---------------+---------------+
+| 0  | 1664764621398 | 1659331936802 |
+| 1  | 1662123596189 | 1659331936802 |
++----+---------------+---------------+
 
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 
