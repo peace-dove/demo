@@ -19,6 +19,7 @@
 #pragma once
 
 #include "cypher/execution_plan/ops/op.h"
+#include "cypher_types.h"
 #include "filter/filter.h"
 
 namespace cypher {
@@ -41,20 +42,30 @@ struct DfsState {
 
 class Predicate {
  public:
-    virtual bool eval(const Path &) = 0;
+    virtual bool eval(std::vector<lgraph::EIter> &eits) = 0;
 };
 
 class HeadPredicate : public Predicate {
  private:
+    // operator
     lgraph::CompareOp op;
-    int64_t operand;
+    // operand
+    FieldData operand;
 
  public:
-    HeadPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
+    HeadPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
+    bool eval(std::vector<lgraph::EIter> &eits) {
+        auto ret = FieldData::Array(0);
         // get first edge's timestamp, check whether it fits the condition
-        int64_t head = path.GetNthEdge(0).tid;
+        for (auto &eit : eits) {
+            if (eit.IsValid()) {
+                ret.array->emplace_back(FieldData(eit.GetField("timestamps")));
+            }
+        }
+        if (ret.array->empty()) {
+            return true;
+        }
+        FieldData head = FieldData(ret.array->front());
         switch (op) {
         case lgraph::CompareOp::LBR_GT:
             return head > operand;
@@ -81,161 +92,158 @@ class HeadPredicate : public Predicate {
     }
 };
 
-class LastPredicate : public Predicate {
- private:
-    lgraph::CompareOp op;
-    int64_t operand;
+// class LastPredicate : public Predicate {
+//  private:
+//     lgraph::CompareOp op;
+//     int64_t operand;
 
- public:
-    LastPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
-        // get first edge's timestamp, check whether it fits the condition
-        int64_t last = path.GetNthEdge(path.Length() - 1).tid;
-        switch (op) {
-        case lgraph::CompareOp::LBR_GT:
-            return last > operand;
-            break;
-        case lgraph::CompareOp::LBR_GE:
-            return last >= operand;
-            break;
-        case lgraph::CompareOp::LBR_LT:
-            return last < operand;
-            break;
-        case lgraph::CompareOp::LBR_LE:
-            return last <= operand;
-            break;
-        case lgraph::CompareOp::LBR_EQ:
-            return last == operand;
-            break;
-        case lgraph::CompareOp::LBR_NEQ:
-            return last != operand;
-            break;
-        default:
-            break;
-        }
-        return false;
-    }
-};
+//  public:
+//     LastPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+//     bool eval(const Path &path) {
+//         if (path.Empty()) return true;
+//         // get first edge's timestamp, check whether it fits the condition
+//         int64_t last = path.GetNthEdge(path.Length() - 1).tid;
+//         switch (op) {
+//         case lgraph::CompareOp::LBR_GT:
+//             return last > operand;
+//             break;
+//         case lgraph::CompareOp::LBR_GE:
+//             return last >= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LT:
+//             return last < operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LE:
+//             return last <= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_EQ:
+//             return last == operand;
+//             break;
+//         case lgraph::CompareOp::LBR_NEQ:
+//             return last != operand;
+//             break;
+//         default:
+//             break;
+//         }
+//         return false;
+//     }
+// };
 
-class IsAscPredicate : public Predicate {
- public:
-    IsAscPredicate() {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
-        for (size_t i = 0; i < path.Length() - 1; i++) {
-            int64_t a = path.GetNthEdge(i).tid;
-            int64_t b = path.GetNthEdge(i + 1).tid;
-            if (a >= b) return false;
-        }
-        return true;
-    }
-};
+// class IsAscPredicate : public Predicate {
+//  public:
+//     IsAscPredicate() {}
+//     bool eval(const Path &path) {
+//         if (path.Empty()) return true;
+//         for (size_t i = 0; i < path.Length() - 1; i++) {
+//             int64_t a = path.GetNthEdge(i).tid;
+//             int64_t b = path.GetNthEdge(i + 1).tid;
+//             if (a >= b) return false;
+//         }
+//         return true;
+//     }
+// };
 
-class IsDescPredicate : public Predicate {
- public:
-    IsDescPredicate() {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
-        for (size_t i = 0; i < path.Length() - 1; i++) {
-            int64_t a = path.GetNthEdge(i).tid;
-            int64_t b = path.GetNthEdge(i + 1).tid;
-            if (a <= b) return false;
-        }
-        return true;
-    }
-};
+// class IsDescPredicate : public Predicate {
+//  public:
+//     IsDescPredicate() {}
+//     bool eval(const Path &path) {
+//         if (path.Empty()) return true;
+//         for (size_t i = 0; i < path.Length() - 1; i++) {
+//             int64_t a = path.GetNthEdge(i).tid;
+//             int64_t b = path.GetNthEdge(i + 1).tid;
+//             if (a <= b) return false;
+//         }
+//         return true;
+//     }
+// };
 
-class MaxInListPredicate : public Predicate {
- private:
-    lgraph::CompareOp op;
-    int64_t operand;
+// class MaxInListPredicate : public Predicate {
+//  private:
+//     lgraph::CompareOp op;
+//     int64_t operand;
 
- public:
-    MaxInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
-        int64_t maxinlist = path.GetNthEdge(0).tid;
-        for (size_t i = 1; i < path.Length(); i++) {
-            maxinlist = std::max(maxinlist, path.GetNthEdge(i).tid);
-        }
-        switch (op) {
-        case lgraph::CompareOp::LBR_GT:
-            return maxinlist > operand;
-            break;
-        case lgraph::CompareOp::LBR_GE:
-            return maxinlist >= operand;
-            break;
-        case lgraph::CompareOp::LBR_LT:
-            return maxinlist < operand;
-            break;
-        case lgraph::CompareOp::LBR_LE:
-            return maxinlist <= operand;
-            break;
-        case lgraph::CompareOp::LBR_EQ:
-            return maxinlist == operand;
-            break;
-        case lgraph::CompareOp::LBR_NEQ:
-            return maxinlist != operand;
-            break;
-        default:
-            break;
-        }
-        return false;
-    }
-};
+//  public:
+//     MaxInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+//     bool eval(const Path &path) {
+//         if (path.Empty()) return true;
+//         int64_t maxinlist = path.GetNthEdge(0).tid;
+//         for (size_t i = 1; i < path.Length(); i++) {
+//             maxinlist = std::max(maxinlist, path.GetNthEdge(i).tid);
+//         }
+//         switch (op) {
+//         case lgraph::CompareOp::LBR_GT:
+//             return maxinlist > operand;
+//             break;
+//         case lgraph::CompareOp::LBR_GE:
+//             return maxinlist >= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LT:
+//             return maxinlist < operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LE:
+//             return maxinlist <= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_EQ:
+//             return maxinlist == operand;
+//             break;
+//         case lgraph::CompareOp::LBR_NEQ:
+//             return maxinlist != operand;
+//             break;
+//         default:
+//             break;
+//         }
+//         return false;
+//     }
+// };
 
-class MinInListPredicate : public Predicate {
- private:
-    lgraph::CompareOp op;
-    int64_t operand;
+// class MinInListPredicate : public Predicate {
+//  private:
+//     lgraph::CompareOp op;
+//     int64_t operand;
 
- public:
-    MinInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
-    bool eval(const Path &path) {
-        if (path.Empty()) return true;
-        int64_t mininlist = path.GetNthEdge(0).tid;
-        for (size_t i = 1; i < path.Length(); i++) {
-            mininlist = std::min(mininlist, path.GetNthEdge(i).tid);
-        }
-        switch (op) {
-        case lgraph::CompareOp::LBR_GT:
-            return mininlist > operand;
-            break;
-        case lgraph::CompareOp::LBR_GE:
-            return mininlist >= operand;
-            break;
-        case lgraph::CompareOp::LBR_LT:
-            return mininlist < operand;
-            break;
-        case lgraph::CompareOp::LBR_LE:
-            return mininlist <= operand;
-            break;
-        case lgraph::CompareOp::LBR_EQ:
-            return mininlist == operand;
-            break;
-        case lgraph::CompareOp::LBR_NEQ:
-            return mininlist != operand;
-            break;
-        default:
-            break;
-        }
-        return false;
-    }
-};
+//  public:
+//     MinInListPredicate(lgraph::CompareOp op, int64_t operand) : op(op), operand(operand) {}
+//     bool eval(const Path &path) {
+//         if (path.Empty()) return true;
+//         int64_t mininlist = path.GetNthEdge(0).tid;
+//         for (size_t i = 1; i < path.Length(); i++) {
+//             mininlist = std::min(mininlist, path.GetNthEdge(i).tid);
+//         }
+//         switch (op) {
+//         case lgraph::CompareOp::LBR_GT:
+//             return mininlist > operand;
+//             break;
+//         case lgraph::CompareOp::LBR_GE:
+//             return mininlist >= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LT:
+//             return mininlist < operand;
+//             break;
+//         case lgraph::CompareOp::LBR_LE:
+//             return mininlist <= operand;
+//             break;
+//         case lgraph::CompareOp::LBR_EQ:
+//             return mininlist == operand;
+//             break;
+//         case lgraph::CompareOp::LBR_NEQ:
+//             return mininlist != operand;
+//             break;
+//         default:
+//             break;
+//         }
+//         return false;
+//     }
+// };
 
 /* Variable Length Expand */
 class VarLenExpand : public OpBase {
-    // bool PerNodeLimit(RTContext *ctx, size_t k) {
-    //     return !ctx->per_node_limit_.has_value() ||
-    //            expand_counts_[k] <= ctx->per_node_limit_.value();
-    // }
+    bool PerNodeLimit(RTContext *ctx, size_t count);
 
     bool NextWithFilter(RTContext *ctx);
 
     void PushFilter(std::shared_ptr<lgraph::Filter> filter);
 
-    // keep predicates
+    // save 6 types of predicates
     std::vector<std::unique_ptr<Predicate>> predicates;
     // add predicate to the vector
     void addPredicate(std::unique_ptr<Predicate> p);

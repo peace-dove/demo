@@ -18,12 +18,14 @@
 //
 
 #include "cypher/execution_plan/ops/op_var_len_expand.h"
+#include <memory>
+#include "cypher_types.h"
 
 namespace cypher {
 
 DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
                    ExpandTowards expand_direction, bool needNext, bool isMaxHop)
-    : currentNodeId(id), level(level), count(0), needNext(needNext) {
+    : currentNodeId(id), level(level), count(1), needNext(needNext) {
     auto &types = relp->Types();
     auto iter_type = lgraph::EIter::NA;
     switch (expand_direction) {
@@ -44,6 +46,10 @@ DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relat
     }
 }
 
+bool VarLenExpand::PerNodeLimit(RTContext *ctx, size_t count) {
+    return !ctx->per_node_limit_.has_value() || count <= ctx->per_node_limit_.value();
+}
+
 bool VarLenExpand::NextWithFilter(RTContext *ctx) {
     while (!stack.empty()) {
         if (needPop) {
@@ -55,12 +61,23 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto &currentEit = currentState.currentEit;
         auto currentLevel = currentState.level;
 
+        // TODO the part of count, needs check
+        auto &currentCount = currentState.count;
+        if (!PerNodeLimit(ctx, currentCount)) {
+            stack.pop_back();
+            if (relp_->path_.Length() != 0) {
+                relp_->path_.PopBack();
+            }
+            continue;
+        }
+
         auto &needNext = currentState.needNext;
 
-        // if currentNodeId's needNext = true, currentEit.next()
+        // if currentNodeId's needNext = true, currentEit.next
         // then set needNext = false
         if (needNext) {
             currentEit->Next();
+            currentCount++;
             needNext = false;
         }
 
@@ -93,6 +110,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             // check path unique
             if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
                 currentEit->Next();
+                currentCount++;
                 continue;
             } else if (ctx->path_unique_) {
                 pattern_graph_->VisitedEdges().Add(*currentEit);
@@ -102,10 +120,20 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
             relp_->path_.Append(currentEit->GetUid());  // add edge's euid to path
 
-            // set currentNodeId's eiter's needNext to true, eit must be valid
+            // eit must be valid, set currentNodeId's eiter's needNext to true
             needNext = true;
             stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_, false,
                                currentLevel + 1 == max_hop_);
+
+            // check predicates here
+            for (auto& p: predicates) {
+                if (!p->eval(relp_->ItsRef())) {
+                    stack.pop_back();
+                    relp_->path_.PopBack();
+                    relp_->ItsRef()[currentLevel].FreeIter();
+                    break;
+                }
+            }
         } else {
             // check unique
             if (ctx->path_unique_ && relp_->path_.Length() != 0) {
@@ -178,32 +206,31 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                 std::string func_name = tmp_filter->GetAeLeft().op.func_name;
                 std::transform(func_name.begin(), func_name.end(), func_name.begin(), ::tolower);
                 if (func_name == "isasc") {
-                    auto p = std::make_unique<IsAscPredicate>();
-                    // std::unique_ptr<Predicate> p(new IsAscPredicate());
-                    addPredicate(std::move(p));
+                    // auto p = std::make_unique<IsAscPredicate>();
+                    // addPredicate(std::move(p));
                 } else if (func_name == "isdesc") {
-                    std::unique_ptr<Predicate> p(new IsDescPredicate());
-                    addPredicate(std::move(p));
+                    // std::unique_ptr<Predicate> p(new IsDescPredicate());
+                    // addPredicate(std::move(p));
                 } else if (func_name == "head") {
                     lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
-                    std::unique_ptr<Predicate> p(new HeadPredicate(op, std::stoi(operand)));
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
+                    auto p = std::make_unique<HeadPredicate>(op, operand);
                     addPredicate(std::move(p));
                 } else if (func_name == "last") {
-                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
-                    std::unique_ptr<Predicate> p(new LastPredicate(op, std::stoi(operand)));
-                    addPredicate(std::move(p));
+                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    // auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                    // std::unique_ptr<Predicate> p(new LastPredicate(op, std::stoi(operand)));
+                    // addPredicate(std::move(p));
                 } else if (func_name == "maxinlist") {
-                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
-                    std::unique_ptr<Predicate> p(new MaxInListPredicate(op, std::stoi(operand)));
-                    addPredicate(std::move(p));
+                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    // auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                    // std::unique_ptr<Predicate> p(new MaxInListPredicate(op, std::stoi(operand)));
+                    // addPredicate(std::move(p));
                 } else if (func_name == "mininlist") {
-                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
-                    std::unique_ptr<Predicate> p(new MinInListPredicate(op, std::stoi(operand)));
-                    addPredicate(std::move(p));
+                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    // auto operand = tmp_filter->GetAeRight().operand.constant.ToString();
+                    // std::unique_ptr<Predicate> p(new MinInListPredicate(op, std::stoi(operand)));
+                    // addPredicate(std::move(p));
                 }
             }
         }
@@ -251,6 +278,9 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         }
         CYPHER_THROW_ASSERT(stack.empty());
         stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_, false, !max_hop_);
+        if (!PerNodeLimit(ctx, stack.front().count)) {
+            continue;
+        }
         relp_->path_.SetStart(startVid);
     }
     return OP_OK;
