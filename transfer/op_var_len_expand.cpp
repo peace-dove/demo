@@ -379,7 +379,6 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                 std::string func_name = tmp_filter->GetAeLeft().op.func_name;
                 std::transform(func_name.begin(), func_name.end(), func_name.begin(), ::tolower);
                 if (func_name == "isasc") {
-                    // std::cout << "add isasc predicate" << std::endl;
                     auto p = std::make_unique<IsAscPredicate>();
                     addPredicate(std::move(p));
                 } else if (func_name == "isdesc") {
