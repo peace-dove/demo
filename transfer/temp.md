@@ -36,7 +36,7 @@ RETURN other;
 
 
 ### cr1
-MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
+MATCH p = (acc:Account {id:4616471093031481453})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
 head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
@@ -50,21 +50,44 @@ medium.id as mediumId,
 medium.type as mediumType
 ORDER BY accountDistance, otherId, mediumId;
 
-  "operationResult" : [ {
-    "otherId" : 152840912353886323,
-    "accountDistance" : 2,
-    "mediumId" : 43980465155202,
-    "mediumType" : "NFC"
-  }, {
-    "otherId" : 1125899906850268,
-    "accountDistance" : 3,
-    "mediumId" : 13194139617169,
-    "mediumType" : "IPv6"
-  } ]
+MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *1..3]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+order by len desc
+RETURN path;
+
+MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *1..3]->(other:Account)
+RETURN other.id;
+
+<!-- use this -->
+MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *2..2]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
+order by len desc
+RETURN path;
+
+MATCH (acc:Account {id:8725999155939212})-[e1:transfer]->(mid:Account {id:171700010671408982})-[e2:transfer]->(other:Account)
+WHERE e1.timestamp < e2.timestamp
+return e1.timestamp, e2.timestamp, other.id;
+
++----+-----------------------------------------------------------+
+| id | path                                                      |
++----+-----------------------------------------------------------+
+| 0  | [8725999155939212,255861028707897460,202099308156163676]  |
+| 1  | [8725999155939212,255861028707897460,4894570019289042920] |
+| 2  | [8725999155939212,255861028707897460,226306156153278388]  |
+| 3  | [8725999155939212,255861028707897460,4770158079582933872] |
+| 4  | [8725999155939212,255861028707897460,4838837973900333835] |
+| 5  | [8725999155939212,171700010671408982,270497727496850066]  |
+| 6  | [8725999155939212,171700010671408982,4865015421612329968] |
+| 7  | [8725999155939212,171700010671408982,4871489071198774281] |
+| 8  | [8725999155939212,171700010671408982,234187455501180702]  |
+| 9  | [8725999155939212,171700010671408982,230247080705145324]  |
++----+-----------------------------------------------------------+
 
 
 ### cr2
-MATCH (p:Person {id:32025})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
 (other:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
@@ -92,9 +115,9 @@ ORDER BY sumLoanAmount DESC, otherId ASC;
   } ]
 
 ### cr5
-MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
+MATCH (person:Person {id:39324})-[e1:own]->(src:Account)
 WITH src
-MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
+MATCH p=(src)-[e2:transfer*3..3]->(dst:Account)
 WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) > 1627020616747 AND
 last(getMemberProp(e2, 'timestamp')) < 1669690342640

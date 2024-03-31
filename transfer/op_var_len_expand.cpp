@@ -88,20 +88,20 @@ bool LastPredicate::eval(std::vector<lgraph::EIter> &eits) {
     if (ret.array->empty()) {
         return true;
     }
-    FieldData head = FieldData(ret.array->back());
+    FieldData last = FieldData(ret.array->back());
     switch (op) {
     case lgraph::CompareOp::LBR_GT:
-        return head > operand;
+        return last > operand;
     case lgraph::CompareOp::LBR_GE:
-        return head >= operand;
+        return last >= operand;
     case lgraph::CompareOp::LBR_LT:
-        return head < operand;
+        return last < operand;
     case lgraph::CompareOp::LBR_LE:
-        return head <= operand;
+        return last <= operand;
     case lgraph::CompareOp::LBR_EQ:
-        return head == operand;
+        return last == operand;
     case lgraph::CompareOp::LBR_NEQ:
-        return head != operand;
+        return last != operand;
     default:
         break;
     }
@@ -147,7 +147,6 @@ bool IsDescPredicate::eval(std::vector<lgraph::EIter> &eits) {
 
 bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     auto ret = cypher::FieldData::Array(0);
-    // get first edge's timestamp, check whether it fits the condition
     for (auto &eit : eits) {
         if (eit.IsValid()) {
             ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
@@ -180,12 +179,11 @@ bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     default:
         break;
     }
-    return true;
+    return false;
 }
 
 bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     auto ret = cypher::FieldData::Array(0);
-    // get first edge's timestamp, check whether it fits the condition
     for (auto &eit : eits) {
         if (eit.IsValid()) {
             ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
@@ -218,7 +216,7 @@ bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     default:
         break;
     }
-    return true;
+    return false;
 }
 
 // VarLenExpand Class
@@ -248,9 +246,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         }
 
         auto &needNext = currentState.needNext;
-
-        // if currentNodeId's needNext = true, currentEit.next
-        // then set needNext = false
+        // if currentNodeId's needNext = true, currentEit.next, then set needNext = false
         if (needNext) {
             currentEit->Next();
             currentCount++;
@@ -283,15 +279,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         }
 
         if (currentEit->IsValid()) {
-            // check path unique
-            if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
-                currentEit->Next();
-                currentCount++;
-                continue;
-            } else if (ctx->path_unique_) {
-                pattern_graph_->VisitedEdges().Add(*currentEit);
-            }
-
             // eit must be valid, set currentNodeId's eiter's needNext to true
             needNext = true;
 
@@ -306,6 +293,15 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             }
 
             if (ok) {
+                // check path unique
+                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
+                    currentEit->Next();
+                    currentCount++;
+                    continue;
+                } else if (ctx->path_unique_) {
+                    pattern_graph_->VisitedEdges().Add(*currentEit);
+                }
+
                 auto neighbor = currentEit->GetNbr(expand_direction_);
                 relp_->path_.Append(currentEit->GetUid());  // add edge's euid to path
                 stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_, false,
@@ -383,6 +379,7 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                 std::string func_name = tmp_filter->GetAeLeft().op.func_name;
                 std::transform(func_name.begin(), func_name.end(), func_name.begin(), ::tolower);
                 if (func_name == "isasc") {
+                    // std::cout << "add isasc predicate" << std::endl;
                     auto p = std::make_unique<IsAscPredicate>();
                     addPredicate(std::move(p));
                 } else if (func_name == "isdesc") {
@@ -395,19 +392,21 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                     addPredicate(std::move(p));
                 } else if (func_name == "last") {
                     lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant;
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
                     auto p = std::make_unique<LastPredicate>(op, operand);
                     addPredicate(std::move(p));
                 } else if (func_name == "maxinlist") {
                     lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant;
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
                     auto p = std::make_unique<MaxInListPredicate>(op, operand);
                     addPredicate(std::move(p));
                 } else if (func_name == "mininlist") {
                     lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    auto operand = tmp_filter->GetAeRight().operand.constant;
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
                     auto p = std::make_unique<MinInListPredicate>(op, operand);
                     addPredicate(std::move(p));
+                } else {
+                    throw lgraph::CypherException("Not in 6 predicates.");
                 }
             }
         }
@@ -455,19 +454,20 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         }
         CYPHER_THROW_ASSERT(stack.empty());
         stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_, false, !max_hop_);
+
         if (!PerNodeLimit(ctx, stack.front().count)) {
             stack.pop_back();
             continue;
         }
 
-        for (auto &p : predicates) {
-            if (!p->eval(relp_->ItsRef())) {
-                if (stack.front().currentEit->IsValid()) {
-                    stack.front().needNext = true;
-                }
-                break;
-            }
-        }
+        // for (auto &p : predicates) {
+        //     if (!p->eval(relp_->ItsRef())) {
+        //         if (stack.front().currentEit->IsValid()) {
+        //             stack.front().needNext = true;
+        //         }
+        //         break;
+        //     }
+        // }
 
         relp_->path_.SetStart(startVid);
     }
