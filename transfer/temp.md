@@ -3,20 +3,6 @@
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 ```
 
-### query
-```sql
-explain MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
-[e2:signIn]-(medium)
-WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
-head(getMemberProp(e1, 'timestamp')) > 90 AND
-last(getMemberProp(e1, 'timestamp')) < 120 AND
-e2.timestamp > 90 AND
-e2.timestamp < 120 AND
-medium.isBlocked = true
-RETURN DISTINCT other.id as otherId
-ORDER BY otherId;
-```
-
 ```
 throw lgraph::CypherException("OK");
 throw lgraph::CypherException(temp);
@@ -254,7 +240,7 @@ RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
 
 
 ### cr11
-MATCH (p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+MATCH (p1:Person {id:66671})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
@@ -286,7 +272,9 @@ RETURN path;
 ### test
 match (n:Account {id:4832081474947659562})<-[:transfer]-(:Account)<-[:transfer]-(n2:Account) return n.id, count(n2);
 
-match (n:Account {id:4832081474947659562})<-[e:transfer *2..2]-(n2:Account) return n.id,count(n2);
+match (n:Account {id:4832081474947659562})<-[e:transfer *1..2]-(n2:Account) return n.id,count(n2);
+
+match (n:Account)<-[e:transfer *1..2]-(n2:Account) return n.id,count(n2);
 
 
 ### test

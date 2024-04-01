@@ -14,7 +14,7 @@
 
 //
 // Created by wt on 18-8-30.
-// bxj on 24-3-30
+// Modified by bxj on 24-3-30.
 //
 #pragma once
 
@@ -117,7 +117,7 @@ class VarLenExpand : public OpBase {
     std::vector<DfsState> stack;
 
     // this flag decides whether need to pop relp_->Path
-    bool needPop = false;
+    bool needPop;
 
  public:
     cypher::PatternGraph *pattern_graph_ = nullptr;

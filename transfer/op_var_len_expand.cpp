@@ -14,7 +14,7 @@
 
 //
 // Created by wt on 18-8-30.
-// bxj on 24-3-30
+// Modified by bxj on 24-3-30.
 //
 
 #include "cypher/execution_plan/ops/op_var_len_expand.h"
@@ -39,7 +39,7 @@ DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relat
         break;
     }
     if (!isMaxHop) {
-        // if max hop, do not init eiter
+        // if reach max hop, do not init eiter
         (relp->ItsRef()[level]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
         currentEit = &(relp->ItsRef()[level]);
     }
@@ -128,7 +128,6 @@ bool IsAscPredicate::eval(std::vector<lgraph::EIter> &eits) {
 
 bool IsDescPredicate::eval(std::vector<lgraph::EIter> &eits) {
     auto ret = cypher::FieldData::Array(0);
-    // get first edge's timestamp, check whether it fits the condition
     for (auto &eit : eits) {
         if (eit.IsValid()) {
             ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
@@ -155,13 +154,14 @@ bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     if (ret.array->empty()) {
         return true;
     }
-    // find max in array
+    // find max in path
     size_t pos = 0;
     for (size_t i = 0; i < ret.array->size(); i++) {
         if ((*ret.array)[i] > (*ret.array)[pos]) {
             pos = i;
         }
     }
+
     FieldData maxInList = cypher::FieldData((*ret.array)[pos]);
     switch (op) {
     case lgraph::CompareOp::LBR_GT:
@@ -192,13 +192,14 @@ bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     if (ret.array->empty()) {
         return true;
     }
-    // find min in array
+    // find min in path
     size_t pos = 0;
     for (size_t i = 0; i < ret.array->size(); i++) {
         if ((*ret.array)[i] < (*ret.array)[pos]) {
             pos = i;
         }
     }
+
     FieldData minInList = cypher::FieldData((*ret.array)[pos]);
     switch (op) {
     case lgraph::CompareOp::LBR_GT:
@@ -227,6 +228,7 @@ bool VarLenExpand::PerNodeLimit(RTContext *ctx, size_t count) {
 bool VarLenExpand::NextWithFilter(RTContext *ctx) {
     while (!stack.empty()) {
         if (needPop) {
+            // it means that, in the last hoop, the path needs pop
             relp_->path_.PopBack();
             needPop = false;
         }
@@ -240,13 +242,13 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         if (!PerNodeLimit(ctx, currentCount)) {
             stack.pop_back();
             if (relp_->path_.Length() != 0) {
-                relp_->path_.PopBack();
+                needPop = true;
             }
             continue;
         }
 
+        // if currentNodeId's needNext is true, currentEit.next(), then set needNext to false
         auto &needNext = currentState.needNext;
-        // if currentNodeId's needNext = true, currentEit.next, then set needNext = false
         if (needNext) {
             currentEit->Next();
             currentCount++;
@@ -254,14 +256,13 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         }
 
         if (currentLevel == max_hop_) {
+            // When reach here, the top eiter must be invalid, and the path meets the condition.
             // check path unique
             if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                 CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
                     relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
             }
             stack.pop_back();
-            neighbor_->PushVid(currentNodeId);
-
             // check label
             if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                 neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
@@ -271,22 +272,22 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 continue;
             }
 
+            neighbor_->PushVid(currentNodeId);
+
             if (relp_->path_.Length() != 0) {
                 needPop = true;
             }
-
             return true;
         }
 
         if (currentEit->IsValid()) {
-            // eit must be valid, set currentNodeId's eiter's needNext to true
+            // eit is valid, set currentNodeId's eiter's needNext to true
             needNext = true;
 
-            // check predicates here
+            // check predicates here, path derived from eiters in stack
             bool ok = true;
             for (auto &p : predicates) {
                 if (!p->eval(relp_->ItsRef())) {
-                    // relp_->path_.PopBack();
                     ok = false;
                     break;
                 }
@@ -301,9 +302,9 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 } else if (ctx->path_unique_) {
                     pattern_graph_->VisitedEdges().Add(*currentEit);
                 }
-
+                // add edge's euid to path
+                relp_->path_.Append(currentEit->GetUid());
                 auto neighbor = currentEit->GetNbr(expand_direction_);
-                relp_->path_.Append(currentEit->GetUid());  // add edge's euid to path
                 stack.emplace_back(ctx, neighbor, currentLevel + 1, relp_, expand_direction_, false,
                                    currentLevel + 1 == max_hop_);
             }
@@ -316,8 +317,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
             stack.pop_back();
             if (currentLevel >= min_hop_) {
-                neighbor_->PushVid(currentNodeId);
-
                 // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
@@ -326,6 +325,8 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     }
                     continue;
                 }
+
+                neighbor_->PushVid(currentNodeId);
 
                 if (relp_->path_.Length() != 0) {
                     needPop = true;
@@ -434,6 +435,7 @@ OpBase::OpResult VarLenExpand::Initialize(RTContext *ctx) {
     record->values[relp_rec_idx_].type = Entry::VAR_LEN_RELP;
     record->values[relp_rec_idx_].relationship = relp_;
     relp_->ItsRef().resize(max_hop_);
+    needPop = false;
     return OP_OK;
 }
 
@@ -452,6 +454,7 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
         CYPHER_THROW_ASSERT(stack.empty());
+        // push the first node and the related eiter into the stack
         stack.emplace_back(ctx, startVid, 0, relp_, expand_direction_, false, !max_hop_);
 
         if (!PerNodeLimit(ctx, stack.front().count)) {
@@ -459,22 +462,14 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
 
-        // for (auto &p : predicates) {
-        //     if (!p->eval(relp_->ItsRef())) {
-        //         if (stack.front().currentEit->IsValid()) {
-        //             stack.front().needNext = true;
-        //         }
-        //         break;
-        //     }
-        // }
-
         relp_->path_.SetStart(startVid);
     }
     return OP_OK;
 }
 
 OpBase::OpResult VarLenExpand::ResetImpl(bool complete) {
-    stack.clear();
+    std::vector<DfsState>().swap(stack);
+    // stack.clear();
     relp_->path_.Clear();
 
     // std::queue<lgraph::VertexId>().swap(frontier_buffer_);

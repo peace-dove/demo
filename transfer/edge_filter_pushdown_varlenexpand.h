@@ -13,7 +13,7 @@
  */
 
 /*
- * Created by bxj on 3/25/23
+ * Created by bxj on 3/25/23.
  */
 #pragma once
 
@@ -23,24 +23,26 @@
 
 namespace cypher {
 /*
- * TODO
- * EdgeFilterPushdownExpand:
- * MATCH (n)-[hascreator:postHasCreator]->(m) WHERE hascreator.creationDate < 20111217 RETURN n;
- * MATCH (n)-[hascreator:postHasCreator]->(m) WHERE hascreator.creationDate < 20111217 AND m.id >
- * 1000 RETURN n;
+ * EdgeFilterPushdownVarLenExpand:
+ * MATCH p=(src:Account)-[e:transfer*1..3]->(dst:Account) WHERE
+ * isAsc(getMemberProp(e,'timestamp'))=true
  *
  * Plan before optimization:
- *      Filter [{edge.condition < int64}]
- *          Expand(All) [a <-- b]
+ * Filter [{isasc(false,getmemberprop(false,e1,timestamp)) = true}]
+ *      Variable Length Expand(All) [acc -->*1..3 dst]
  *
  * Plan after optimization:
- *          Expand(All) [a <-- b, EdgeFilter (edge.condition < int64)]
+ *      Variable Length Expand(All) [acc -->*1..3 dst VarLenEdgeFilter
+ * {isasc(false,getmemberprop(false,e1,timestamp)) = true}]
  */
+
 class EdgeFilterPushdownVarLenExpand : public OptPass {
     void _AddEdgeFilterOp(OpFilter *&op_filter, VarLenExpand *&op_varlenexpand) {
+        // op_post -> op_filter -> op_no_edge_filter -> op_varlenexpand
         auto filter = op_filter->filter_;
         op_varlenexpand->PushDownEdgeFilter(filter);
         auto op_post = op_filter->parent;
+        // find the place of op_filter, then replace it by op_filter->children[0]
         for (auto i = op_post->children.begin(); i != op_post->children.end(); i++) {
             if (*i == op_filter) {
                 op_post->RemoveChild(op_filter);
@@ -58,17 +60,14 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
             op->children[0]->type == OpType::VAR_LEN_EXPAND) {
             op_filter = dynamic_cast<OpFilter *>(op);
             op_varlenexpand = dynamic_cast<VarLenExpand *>(op->children[0]);
-            // if exist filter on var len edge
+            // if exist filter on varlenexpand edge
             std::string edge_alias = op_varlenexpand->relp_->Alias();
-
-            std::set<std::string> ret = op_filter->filter_->Alias();
-
             if (op_filter->filter_->ContainAlias({edge_alias}) &&
                 op_filter->filter_->BinaryOnlyContainsAND()) {
                 // if filter has edge_filter, split filters
                 auto clone_filter = op_filter->filter_->Clone();
 
-                // collect filters which only contains edge_alias
+                // collect filters which only contain edge_alias
                 // e.g. head(getMemberProp(e2, 'timestamp')) > 1662123596189
                 op_filter->filter_->RemoveFilterWhen(op_filter->filter_,
                                                      [&edge_alias](const auto &b, const auto &e) {
@@ -88,7 +87,7 @@ class EdgeFilterPushdownVarLenExpand : public OptPass {
                                                    return false;
                                                });
 
-                // split into two filters
+                // split into two filters, when both are not nullpter
                 if (clone_filter && op_filter->filter_) {
                     // op_filter -> op_no_edge_filter -> varlenexpand
                     auto op_no_edge_filter = new OpFilter(clone_filter);
