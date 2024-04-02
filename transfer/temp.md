@@ -240,7 +240,7 @@ RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
 
 
 ### cr11
-MATCH (p1:Person {id:66671})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+MATCH (p1:Person {id:31073})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
