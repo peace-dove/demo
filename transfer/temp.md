@@ -9,18 +9,6 @@ throw lgraph::CypherException(temp);
 throw lgraph::CypherException(std::to_string((int)(op_filter->filter_->Type())));
 ```
 
-
-make install -j48
-lgraph_server -d restart
-
-python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
-
-
-MATCH (p:Person {id:32025})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
-(other:Account)
-RETURN other;
-
-
 ### cr1
 MATCH p = (acc:Account {id:4616471093031481453})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
@@ -240,12 +228,25 @@ RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
 
 
 ### cr11
-MATCH (p1:Person {id:31073})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+
+id: 31073 58403
+
+MATCH (p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
 WITH sum(loan.loanAmount) as sumLoanAmount, count(distinct loan) as numLoans
 RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
+
+MATCH p=(p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person)
+WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
+maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path
+return path;
+
+MATCH p=(p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person)
+WITH DISTINCT getMemberProp(nodes(p), 'id') as path
+return path;
 
 MATCH (p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747
@@ -303,3 +304,8 @@ common.h Path中加入tids_
 Path中tids_改回来，在contains使用的时候强行置为0
 
 iterator.h 有两处修改
+
+测试修改的文件
+scheduler.cpp
+state_machine.cpp
+runtime_context.h
