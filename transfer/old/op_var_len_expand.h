@@ -242,14 +242,12 @@ class VarLenExpand : public OpBase {
             int64_t nbr_id = GetFirstFromKthHop(ctx, hop_);
             if (nbr_id < 0) return OP_REFRESH;
             neighbor_->PushVid(nbr_id);
-            VAR_LEN_EXP_DUMP_FOR_DEBUG();
             state_ = Consuming;
             return OP_OK;
         }
         auto vid = GetNextFromKthHop(ctx, hop_, false);
         if (vid >= 0) {
             neighbor_->PushVid(vid);
-            VAR_LEN_EXP_DUMP_FOR_DEBUG();
             return OP_OK;
         } else {
             // need expand to next hop
@@ -275,7 +273,6 @@ class VarLenExpand : public OpBase {
             relp_->path_.Append(eits_[hop_ - 1].GetUid());
             // TODO(anyone) remove in last hop
             if (ctx->path_unique_) pattern_graph_->VisitedEdges().Add(eits_[hop_ - 1]);
-            VAR_LEN_EXP_DUMP_FOR_DEBUG();
             return OP_OK;
         }
     }
