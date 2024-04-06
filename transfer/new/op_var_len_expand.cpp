@@ -179,6 +179,29 @@ bool IsDescPredicate::eval(std::vector<lgraph::EIter> &eits) {
     return true;
 }
 
+bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
+    myPrint("in Desc predicate");
+    if (stack.empty()) {
+        // length is 0
+        return true;
+    }
+    // length >= 1
+    if (!stack.back().currentEit->IsValid()) {
+        return false;
+    }
+    if (stack.size() == 1) {
+        return true;
+    }
+    auto it = stack.end();
+    if ((it - 1)->timestamp < (it - 2)->timestamp) {
+        // is desc
+        myPrint("is desc");
+        return true;
+    }
+    myPrint("not desc");
+    return false;
+}
+
 bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     auto ret = cypher::FieldData::Array(0);
     for (auto &eit : eits) {
@@ -217,6 +240,40 @@ bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     return false;
 }
 
+bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
+    if (stack.empty()) {
+        return true;
+    }
+    if (!stack.back().currentEit->IsValid()) {
+        return false;
+    }
+    FieldData maxInList;
+    if (stack.size() == 1) {
+        stack.back().maxTimestamp = stack.back().timestamp;
+        maxInList = stack.back().timestamp;
+    } else {
+        auto it = stack.end();
+        if ((it - 1)->timestamp <= (it - 2)->maxTimestamp) {
+            return true;
+        } else {
+            (it - 1)->maxTimestamp = (it - 1)->timestamp;
+            maxInList = (it - 1)->maxTimestamp;
+        }
+    }
+    switch (op) {
+    case lgraph::CompareOp::LBR_LT:
+        return maxInList < operand;
+    case lgraph::CompareOp::LBR_LE:
+        return maxInList <= operand;
+    case lgraph::CompareOp::LBR_GT:
+    case lgraph::CompareOp::LBR_GE:
+    case lgraph::CompareOp::LBR_EQ:
+    case lgraph::CompareOp::LBR_NEQ:
+    default:
+        return false;
+    }
+}
+
 bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
     auto ret = cypher::FieldData::Array(0);
     for (auto &eit : eits) {
@@ -253,6 +310,40 @@ bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
         break;
     }
     return false;
+}
+
+bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
+    if (stack.empty()) {
+        return true;
+    }
+    if (!stack.back().currentEit->IsValid()) {
+        return false;
+    }
+    FieldData minInList;
+    if (stack.size() == 1) {
+        stack.back().minTimestamp = stack.back().timestamp;
+        minInList = stack.back().timestamp;
+    } else {
+        auto it = stack.end();
+        if ((it - 1)->timestamp >= (it - 2)->minTimestamp) {
+            return true;
+        } else {
+            (it - 1)->minTimestamp = (it - 1)->timestamp;
+            minInList = (it - 1)->minTimestamp;
+        }
+    }
+    switch (op) {
+    case lgraph::CompareOp::LBR_GT:
+        return minInList > operand;
+    case lgraph::CompareOp::LBR_GE:
+        return minInList >= operand;
+    case lgraph::CompareOp::LBR_LT:
+    case lgraph::CompareOp::LBR_LE:
+    case lgraph::CompareOp::LBR_EQ:
+    case lgraph::CompareOp::LBR_NEQ:
+    default:
+        return false;
+    }
 }
 
 // VarLenExpand Class
@@ -448,7 +539,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 if (!stack.empty()) {
                     stack.back().needNext = true;
                 }
-
                 return true;
             }
         }
@@ -510,15 +600,15 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                     // auto p = std::make_unique<LastPredicate>(op, operand);
                     // addPredicate(std::move(p));
                 } else if (func_name == "maxinlist") {
-                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    // FieldData operand = tmp_filter->GetAeRight().operand.constant;
-                    // auto p = std::make_unique<MaxInListPredicate>(op, operand);
-                    // addPredicate(std::move(p));
+                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
+                    auto p = std::make_unique<MaxInListPredicate>(op, operand);
+                    addPredicate(std::move(p));
                 } else if (func_name == "mininlist") {
-                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    // FieldData operand = tmp_filter->GetAeRight().operand.constant;
-                    // auto p = std::make_unique<MinInListPredicate>(op, operand);
-                    // addPredicate(std::move(p));
+                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
+                    auto p = std::make_unique<MinInListPredicate>(op, operand);
+                    addPredicate(std::move(p));
                 } else {
                     throw lgraph::CypherException("Not in 6 predicates.");
                 }

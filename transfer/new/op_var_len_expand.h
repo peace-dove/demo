@@ -37,6 +37,8 @@ struct DfsState {
 
     FieldData timestamp;
     FieldData lastTimestamp;
+    FieldData maxTimestamp;
+    FieldData minTimestamp;
 
     DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
              ExpandTowards expand_direction, bool needNext, bool isMaxHop);
@@ -85,6 +87,7 @@ class IsDescPredicate : public Predicate {
  public:
     IsDescPredicate() {}
     bool eval(std::vector<lgraph::EIter> &eits) override;
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 class MaxInListPredicate : public Predicate {
@@ -95,6 +98,7 @@ class MaxInListPredicate : public Predicate {
  public:
     MaxInListPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
     bool eval(std::vector<lgraph::EIter> &eits) override;
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 class MinInListPredicate : public Predicate {
@@ -105,6 +109,7 @@ class MinInListPredicate : public Predicate {
  public:
     MinInListPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
     bool eval(std::vector<lgraph::EIter> &eits) override;
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 /* Variable Length Expand */

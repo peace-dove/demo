@@ -36,6 +36,11 @@ RETURN other.id;
 检查什么时候返回
 stack path path_unique同步
 
+my: 0.005307197570800781
+new: 0.0105
+
+my: 1.5668585300445557 0.0166
+
 <!-- use this -->
 MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *2..2]->(other:Account)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
