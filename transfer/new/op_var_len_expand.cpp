@@ -140,7 +140,6 @@ bool IsAscPredicate::eval(std::vector<lgraph::EIter> &eits) {
 
 bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
     myPrint("in Asc predicate");
-
     if (stack.empty()) {
         // length is 0
         return true;
@@ -282,14 +281,17 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto &needNext = currentState.needNext;
         if (needNext) {
             CYPHER_THROW_ASSERT(currentEit->IsValid());
+            CYPHER_THROW_ASSERT(currentEit->GetUid() ==
+                                relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1));
             // check unique, delete previous edge
             if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                 CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
                     relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
             }
             relp_->path_.PopBack();
-            
+
             currentEit->Next();
+            needNext = false;
             currentState.getTime();
             currentCount++;
 
@@ -314,8 +316,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                         break;
                     }
                 }
-                // reach here, the all predicate is ok
-                std::cout << "after predicate:" << std::endl;
+                std::cout << "after predicate: " << std::endl;
                 if (continueFind) {
                     continueFind = false;
                     continue;
@@ -344,19 +345,15 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     pattern_graph_->VisitedEdges().Add(*stack.back().currentEit);
                 }
             }
-
-            needNext = false;
         }
 
-        if (relp_->path_.Length() == currentLevel && currentLevel == max_hop_) {
+        if ((int)relp_->path_.Length() == currentLevel && currentLevel == max_hop_) {
             if (currentEit->IsValid()) {
                 // the back eit is valid
                 // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                    if (relp_->path_.Length() != 0) {
-                        relp_->path_.PopBack();
-                    }
+                    needNext = true;
                     continue;
                 }
 
@@ -366,7 +363,8 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
                 return true;
             } else {
-                // the back eit is invalid
+                // the back eit is invalid, never go here
+                CYPHER_THROW_ASSERT(false);
                 stack.pop_back();
                 continue;
             }
@@ -434,9 +432,9 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             }
 
         } else {
-            // now the eit is vaild
+            // now the eit is invaild
             stack.pop_back();
-            if (relp_->path_.Length() == currentLevel && currentLevel >= min_hop_) {
+            if ((int)relp_->path_.Length() >= min_hop_) {
                 // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
@@ -447,10 +445,9 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 }
 
                 neighbor_->PushVid(relp_->path_.GetNthEdge(relp_->path_.Length() - 1).dst);
-
-                // if (relp_->path_.Length() != 0) {
-                //     needPop = true;
-                // }
+                if (!stack.empty()) {
+                    stack.back().needNext = true;
+                }
 
                 return true;
             }

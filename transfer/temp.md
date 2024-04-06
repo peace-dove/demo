@@ -33,6 +33,9 @@ RETURN path;
 MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *1..3]->(other:Account)
 RETURN other.id;
 
+检查什么时候返回
+stack path path_unique同步
+
 <!-- use this -->
 MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *2..2]->(other:Account)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
