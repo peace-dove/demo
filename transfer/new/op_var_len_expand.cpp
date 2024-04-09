@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 AntGroup CO., Ltd.
+ * Copyright 2024 AntGroup CO., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 //
 
 #include "cypher/execution_plan/ops/op_var_len_expand.h"
+#include <cstddef>
 
 namespace cypher {
 
@@ -53,9 +54,9 @@ void DfsState::getTime() {
         return;
     }
     timestamp = lgraph::FieldData(currentEit->GetField("timestamp"));
-    std::cout << "Now edge is: " + currentEit->GetUid().ToString() +
-                     ", timestamp is:" + timestamp.ToString()
-              << std::endl;
+    // std::cout << "Now edge is: " + currentEit->GetUid().ToString() +
+    //                  ", timestamp is:" + timestamp.ToString()
+    //           << std::endl;
 }
 
 // Predicate Class
@@ -247,10 +248,12 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto &currentState = stack.back();
         // auto currentNodeId = currentState.currentNodeId;
         auto &currentEit = currentState.currentEit;
-        auto currentLevel = currentState.level;
+        auto currentLevel = currentState.level;  // actually, is the path length in stack
 
-        // TODO the part of count, needs check
+        // TODO
+        // the part of count, needs check
         auto &currentCount = currentState.count;
+
         // if (!PerNodeLimit(ctx, currentCount)) {
         //     stack.pop_back();
         //     if (relp_->path_.Length() != 0) {
@@ -259,12 +262,13 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         //     continue;
         // }
 
-        // if currentNodeId's needNext is true, currentEit.next, then set needNext to false
+        // if needNext is true, the back currentEit next, then set needNext to false
         auto &needNext = currentState.needNext;
         if (needNext) {
-            CYPHER_THROW_ASSERT(currentEit->IsValid());
-            CYPHER_THROW_ASSERT(currentEit->GetUid() ==
-                                relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1));
+            // deal with the top eit, only Next in this block, don't pop stack
+            // CYPHER_THROW_ASSERT(currentEit->IsValid());
+            // CYPHER_THROW_ASSERT(currentEit->GetUid() ==
+            //                     relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1));
             // check unique, delete previous edge
             if (ctx->path_unique_ && relp_->path_.Length() != 0) {
                 CYPHER_THROW_ASSERT(pattern_graph_->VisitedEdges().Erase(
@@ -298,20 +302,20 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     }
                 }
                 if (continueFind) {
-                    continueFind = false;
                     continue;
                 }
                 // when reach here, the eit, path's predicate are ok
+                // CYPHER_THROW_ASSERT(currentEit == stack.back().currentEit);
+                // CYPHER_THROW_ASSERT(currentEit->IsValid());
                 isFinding = false;
 
                 // add edge's euid to path
-                myPrint(relp_->path_.ToString());
-                myPrint(stack.back().currentEit->GetUid().ToString());
-                myPrint("Before append");
-                relp_->path_.Append(stack.back().currentEit->GetUid());
+                // myPrint(relp_->path_.ToString());
+                // myPrint(stack.back().currentEit->GetUid().ToString());
+                // myPrint("Before append");
+                relp_->path_.Append(currentEit->GetUid());
 
-                if (ctx->path_unique_ &&
-                    pattern_graph_->VisitedEdges().Contains(*stack.back().currentEit)) {
+                if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
                     // if this edge has been added, find next edge from the same eiter
                     isFinding = true;
                     // set next
@@ -322,32 +326,24 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     relp_->path_.PopBack();
                 } else if (ctx->path_unique_) {
                     // this is ok, add edge to path unique
-                    pattern_graph_->VisitedEdges().Add(*stack.back().currentEit);
+                    pattern_graph_->VisitedEdges().Add(*currentEit);
                 }
             }
         }
 
         if ((int)relp_->path_.Length() == currentLevel && currentLevel == max_hop_) {
-            if (currentEit->IsValid()) {
-                // the back eit is valid
-                // check label
-                if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
-                    neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                    needNext = true;
-                    continue;
-                }
+            // CYPHER_THROW_ASSERT(currentEit->IsValid());
+            // the top eit is valid
+            neighbor_->PushVid(currentEit->GetNbr(expand_direction_));
+            needNext = true;
 
-                neighbor_->PushVid(currentEit->GetNbr(expand_direction_));
-
-                needNext = true;
-
-                return true;
-            } else {
-                // the back eit is invalid, never go here
-                CYPHER_THROW_ASSERT(false);
-                stack.pop_back();
+            // check label
+            if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
+                neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
                 continue;
             }
+
+            return true;
         }
 
         if (currentEit->IsValid()) {
@@ -362,7 +358,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             bool isFinding = true;
             while (isFinding) {
                 bool continueFind = false;
-                // check predicates here, path derived from eiters in stack
+                // check predicates here, path derived from eiters
                 for (auto &p : predicates) {
                     if (!p->eval(stack)) {
                         // not fit predicate
@@ -379,18 +375,16 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                         break;
                     }
                 }
-                // reach here, the all predicate is ok
                 if (continueFind) {
-                    continueFind = false;
                     continue;
                 }
                 // when reach here, the eit, path's predicate are ok
                 isFinding = false;
 
                 // add edge's euid to path
-                myPrint(relp_->path_.ToString());
-                myPrint(stack.back().currentEit->GetUid().ToString());
-                myPrint("Before append");
+                // myPrint(relp_->path_.ToString());
+                // myPrint(stack.back().currentEit->GetUid().ToString());
+                // myPrint("Before append");
                 relp_->path_.Append(stack.back().currentEit->GetUid());
 
                 if (ctx->path_unique_ &&
@@ -401,7 +395,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     stack.back().currentEit->Next();
                     stack.back().getTime();
                     stack.back().count++;
-                    // pop path
+                    // the edge occurs before, pop it
                     relp_->path_.PopBack();
                 } else if (ctx->path_unique_) {
                     // this is ok, add edge
@@ -410,22 +404,21 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             }
 
         } else {
-            // now the eit is invaild
+            // now the top eit is invaild
             stack.pop_back();
-            if ((int)relp_->path_.Length() >= min_hop_) {
+            auto pathLen = relp_->path_.Length();
+            if (pathLen == stack.size() && pathLen >= (size_t)min_hop_) {
+                // CYPHER_THROW_ASSERT(stack.back().currentEit->IsValid());
+                neighbor_->PushVid(stack.back().currentEit->GetNbr(expand_direction_));
+
+                stack.back().needNext = true;
+
                 // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
-                    if (relp_->path_.Length() != 0) {
-                        relp_->path_.PopBack();
-                    }
                     continue;
                 }
 
-                neighbor_->PushVid(relp_->path_.GetNthEdge(relp_->path_.Length() - 1).dst);
-                if (!stack.empty()) {
-                    stack.back().needNext = true;
-                }
                 return true;
             }
         }
@@ -550,6 +543,7 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         stack.emplace_back(ctx, startVid, 1, relp_, expand_direction_, false, 1 > max_hop_);
         stack.back().getTime();
 
+        // check the first node and edge
         bool nextNode = false;
         bool isFinding = true;
         while (isFinding) {
@@ -559,13 +553,13 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
                 if (!p->eval(stack)) {
                     // when the edge in the stack not fit
                     if (stack.back().currentEit->IsValid()) {
-                        // still vaild
+                        // still vaild, find next edge
                         stack.back().currentEit->Next();
                         stack.back().getTime();
                         stack.back().count++;
                         continueCheck = true;
                     } else {
-                        // this eiter is not valid, find next node
+                        // the top eiter is not valid, should find next node
                         stack.pop_back();
                         nextNode = true;
                     }
@@ -573,6 +567,8 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
                 }
             }
             if (continueCheck) {
+                // find next edge of the same node
+                // continueCheck = false;
                 continue;
             } else {
                 // if ok, it means this path is ok, find next hop
@@ -584,13 +580,16 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
         // when reach here, the first node and eiter are ok
-        if (!PerNodeLimit(ctx, stack.front().count)) {
-            stack.pop_back();
-            continue;
-        }
+
+        // if (!PerNodeLimit(ctx, stack.front().count)) {
+        //     stack.pop_back();
+        //     continue;
+        // }
+
         relp_->path_.SetStart(startVid);
         relp_->path_.Append(stack.back().currentEit->GetUid());
         if (ctx->path_unique_) {
+            // add the first edge
             pattern_graph_->VisitedEdges().Add(*stack.back().currentEit);
         }
     }
