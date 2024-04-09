@@ -36,7 +36,6 @@ struct DfsState {
     bool needNext;
 
     FieldData timestamp;
-    FieldData lastTimestamp;
     FieldData maxTimestamp;
     FieldData minTimestamp;
 
@@ -48,7 +47,6 @@ struct DfsState {
 
 class Predicate {
  public:
-    virtual bool eval(std::vector<lgraph::EIter> &eits) = 0;
     virtual bool eval(std::vector<DfsState> &stack) = 0;
 };
 
@@ -61,7 +59,7 @@ class HeadPredicate : public Predicate {
 
  public:
     HeadPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 class LastPredicate : public Predicate {
@@ -73,20 +71,18 @@ class LastPredicate : public Predicate {
 
  public:
     LastPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 class IsAscPredicate : public Predicate {
  public:
     IsAscPredicate() {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
     bool eval(std::vector<DfsState> &stack) override;
 };
 
 class IsDescPredicate : public Predicate {
  public:
     IsDescPredicate() {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
     bool eval(std::vector<DfsState> &stack) override;
 };
 
@@ -97,7 +93,6 @@ class MaxInListPredicate : public Predicate {
 
  public:
     MaxInListPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
     bool eval(std::vector<DfsState> &stack) override;
 };
 
@@ -108,7 +103,6 @@ class MinInListPredicate : public Predicate {
 
  public:
     MinInListPredicate(lgraph::CompareOp op, FieldData operand) : op(op), operand(operand) {}
-    bool eval(std::vector<lgraph::EIter> &eits) override;
     bool eval(std::vector<DfsState> &stack) override;
 };
 

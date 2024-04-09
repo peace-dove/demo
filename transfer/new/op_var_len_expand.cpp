@@ -42,8 +42,9 @@ DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relat
     }
     if (!isMaxHop) {
         // if reach max hop, do not init eiter
-        (relp->ItsRef()[level]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
-        currentEit = &(relp->ItsRef()[level]);
+        // level start from 1, mention it
+        (relp->ItsRef()[level - 1]).Initialize(ctx->txn_->GetTxn().get(), iter_type, id, types);
+        currentEit = &(relp->ItsRef()[level - 1]);
     }
 }
 
@@ -58,18 +59,19 @@ void DfsState::getTime() {
 }
 
 // Predicate Class
-bool HeadPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    // get first edge's timestamp, check whether it fits the condition
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
+bool HeadPredicate::eval(std::vector<DfsState> &stack) {
+    if (stack.empty()) {
+        myPrint("head empty");
         return true;
     }
-    FieldData head = FieldData(ret.array->front());
+    if (!stack.back().currentEit->IsValid()) {
+        return false;
+    }
+    if (stack.size() >= 2) {
+        return true;
+    }
+    // only check the first timestamp
+    FieldData head = stack.front().timestamp;
     switch (op) {
     case lgraph::CompareOp::LBR_GT:
         return head > operand;
@@ -84,23 +86,20 @@ bool HeadPredicate::eval(std::vector<lgraph::EIter> &eits) {
     case lgraph::CompareOp::LBR_NEQ:
         return head != operand;
     default:
-        break;
+        return false;
     }
-    return false;
 }
 
-bool LastPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    // get last edge's timestamp, check whether it fits the condition
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
+bool LastPredicate::eval(std::vector<DfsState> &stack) {
+    if (stack.empty()) {
+        myPrint("last empty");
         return true;
     }
-    FieldData last = FieldData(ret.array->back());
+    if (!stack.back().currentEit->IsValid()) {
+        return false;
+    }
+    // last timestamp, check every one
+    FieldData last = stack.back().timestamp;
     switch (op) {
     case lgraph::CompareOp::LBR_GT:
         return last > operand;
@@ -115,32 +114,13 @@ bool LastPredicate::eval(std::vector<lgraph::EIter> &eits) {
     case lgraph::CompareOp::LBR_NEQ:
         return last != operand;
     default:
-        break;
+        return false;
     }
-    return false;
-}
-
-bool IsAscPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
-        return true;
-    }
-    for (size_t i = 1; i < ret.array->size(); i++) {
-        if ((*ret.array)[i - 1] >= (*ret.array)[i]) {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
-    myPrint("in Asc predicate");
     if (stack.empty()) {
+        myPrint("asc empty");
         // length is 0
         return true;
     }
@@ -153,35 +133,16 @@ bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
     }
     auto it = stack.end();
     if ((it - 1)->timestamp > (it - 2)->timestamp) {
-        // is asc
-        myPrint("is asc");
+        // check the last two timestamp, know is asc
         return true;
+    } else {
+        return false;
     }
-    myPrint("not asc");
-    return false;
-}
-
-bool IsDescPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
-        return true;
-    }
-    for (size_t i = 1; i < ret.array->size(); i++) {
-        if ((*ret.array)[i - 1] <= (*ret.array)[i]) {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
-    myPrint("in Desc predicate");
     if (stack.empty()) {
+        myPrint("desc empty");
         // length is 0
         return true;
     }
@@ -195,53 +156,16 @@ bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
     auto it = stack.end();
     if ((it - 1)->timestamp < (it - 2)->timestamp) {
         // is desc
-        myPrint("is desc");
         return true;
+    } else {
+        return false;
     }
-    myPrint("not desc");
-    return false;
-}
-
-bool MaxInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
-        return true;
-    }
-    // find max in path
-    size_t pos = 0;
-    for (size_t i = 0; i < ret.array->size(); i++) {
-        if ((*ret.array)[i] > (*ret.array)[pos]) {
-            pos = i;
-        }
-    }
-
-    FieldData maxInList = cypher::FieldData((*ret.array)[pos]);
-    switch (op) {
-    case lgraph::CompareOp::LBR_GT:
-        return maxInList > operand;
-    case lgraph::CompareOp::LBR_GE:
-        return maxInList >= operand;
-    case lgraph::CompareOp::LBR_LT:
-        return maxInList < operand;
-    case lgraph::CompareOp::LBR_LE:
-        return maxInList <= operand;
-    case lgraph::CompareOp::LBR_EQ:
-        return maxInList == operand;
-    case lgraph::CompareOp::LBR_NEQ:
-        return maxInList != operand;
-    default:
-        break;
-    }
-    return false;
 }
 
 bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
+    // actually, it can only deal with maxinlist < ...
     if (stack.empty()) {
+        myPrint("maxinlist empty");
         return true;
     }
     if (!stack.back().currentEit->IsValid()) {
@@ -250,10 +174,12 @@ bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
     FieldData maxInList;
     if (stack.size() == 1) {
         stack.back().maxTimestamp = stack.back().timestamp;
-        maxInList = stack.back().timestamp;
+        maxInList = stack.back().maxTimestamp;
     } else {
         auto it = stack.end();
         if ((it - 1)->timestamp <= (it - 2)->maxTimestamp) {
+            // if the last timestamp is no larger than the previous maxTimestamp
+            (it - 1)->maxTimestamp = (it - 2)->maxTimestamp;
             return true;
         } else {
             (it - 1)->maxTimestamp = (it - 1)->timestamp;
@@ -274,46 +200,10 @@ bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
     }
 }
 
-bool MinInListPredicate::eval(std::vector<lgraph::EIter> &eits) {
-    auto ret = cypher::FieldData::Array(0);
-    for (auto &eit : eits) {
-        if (eit.IsValid()) {
-            ret.array->emplace_back(lgraph::FieldData(eit.GetField("timestamp")));
-        }
-    }
-    if (ret.array->empty()) {
-        return true;
-    }
-    // find min in path
-    size_t pos = 0;
-    for (size_t i = 0; i < ret.array->size(); i++) {
-        if ((*ret.array)[i] < (*ret.array)[pos]) {
-            pos = i;
-        }
-    }
-
-    FieldData minInList = cypher::FieldData((*ret.array)[pos]);
-    switch (op) {
-    case lgraph::CompareOp::LBR_GT:
-        return minInList > operand;
-    case lgraph::CompareOp::LBR_GE:
-        return minInList >= operand;
-    case lgraph::CompareOp::LBR_LT:
-        return minInList < operand;
-    case lgraph::CompareOp::LBR_LE:
-        return minInList <= operand;
-    case lgraph::CompareOp::LBR_EQ:
-        return minInList == operand;
-    case lgraph::CompareOp::LBR_NEQ:
-        return minInList != operand;
-    default:
-        break;
-    }
-    return false;
-}
-
 bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
+    // only deal with minInlist > ...
     if (stack.empty()) {
+        myPrint("mininlist empty");
         return true;
     }
     if (!stack.back().currentEit->IsValid()) {
@@ -322,10 +212,11 @@ bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
     FieldData minInList;
     if (stack.size() == 1) {
         stack.back().minTimestamp = stack.back().timestamp;
-        minInList = stack.back().timestamp;
+        minInList = stack.back().minTimestamp;
     } else {
         auto it = stack.end();
         if ((it - 1)->timestamp >= (it - 2)->minTimestamp) {
+            (it - 1)->minTimestamp = (it - 2)->minTimestamp;
             return true;
         } else {
             (it - 1)->minTimestamp = (it - 1)->timestamp;
@@ -388,7 +279,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
             bool isFinding = true;
             while (isFinding) {
-                std::cout << "before predicate:" << std::endl;
                 bool continueFind = false;
                 // check predicates here, path derived from eiters in stack
                 for (auto &p : predicates) {
@@ -407,7 +297,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                         break;
                     }
                 }
-                std::cout << "after predicate: " << std::endl;
                 if (continueFind) {
                     continueFind = false;
                     continue;
@@ -472,7 +361,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
             bool isFinding = true;
             while (isFinding) {
-                std::cout << "before predicate:" << std::endl;
                 bool continueFind = false;
                 // check predicates here, path derived from eiters in stack
                 for (auto &p : predicates) {
@@ -492,7 +380,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     }
                 }
                 // reach here, the all predicate is ok
-                std::cout << "after predicate:" << std::endl;
                 if (continueFind) {
                     continueFind = false;
                     continue;
@@ -587,18 +474,18 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
                     auto p = std::make_unique<IsAscPredicate>();
                     addPredicate(std::move(p));
                 } else if (func_name == "isdesc") {
-                    // auto p = std::make_unique<IsDescPredicate>();
-                    // addPredicate(std::move(p));
+                    auto p = std::make_unique<IsDescPredicate>();
+                    addPredicate(std::move(p));
                 } else if (func_name == "head") {
-                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    // FieldData operand = tmp_filter->GetAeRight().operand.constant;
-                    // auto p = std::make_unique<HeadPredicate>(op, operand);
-                    // addPredicate(std::move(p));
+                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
+                    auto p = std::make_unique<HeadPredicate>(op, operand);
+                    addPredicate(std::move(p));
                 } else if (func_name == "last") {
-                    // lgraph::CompareOp op = tmp_filter->GetCompareOp();
-                    // FieldData operand = tmp_filter->GetAeRight().operand.constant;
-                    // auto p = std::make_unique<LastPredicate>(op, operand);
-                    // addPredicate(std::move(p));
+                    lgraph::CompareOp op = tmp_filter->GetCompareOp();
+                    FieldData operand = tmp_filter->GetAeRight().operand.constant;
+                    auto p = std::make_unique<LastPredicate>(op, operand);
+                    addPredicate(std::move(p));
                 } else if (func_name == "maxinlist") {
                     lgraph::CompareOp op = tmp_filter->GetCompareOp();
                     FieldData operand = tmp_filter->GetAeRight().operand.constant;
@@ -659,7 +546,7 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         }
         CYPHER_THROW_ASSERT(stack.empty());
         // push the first node and the related eiter into the stack
-        // it means a node and the related edge is chosen, path length is 1
+        // the first node and the related edge is chosen, path length is 1
         stack.emplace_back(ctx, startVid, 1, relp_, expand_direction_, false, 1 > max_hop_);
         stack.back().getTime();
 
@@ -697,7 +584,6 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
         // when reach here, the first node and eiter are ok
-
         if (!PerNodeLimit(ctx, stack.front().count)) {
             stack.pop_back();
             continue;
