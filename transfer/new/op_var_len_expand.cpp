@@ -257,13 +257,13 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         // the part of count, needs check
         auto &currentCount = currentState.count;
 
-        // if (!PerNodeLimit(ctx, currentCount)) {
-        //     stack.pop_back();
-        //     if (relp_->path_.Length() != 0) {
-        //         needPop = true;
-        //     }
-        //     continue;
-        // }
+        if (!PerNodeLimit(ctx, currentCount)) {
+            stack.pop_back();
+            if (relp_->path_.Length() != 0) {
+                needPop = true;
+            }
+            continue;
+        }
 
         // if needNext is true, the back currentEit next, then set needNext to false
         auto &needNext = currentState.needNext;
@@ -587,10 +587,10 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
         }
         // when reach here, the first node and eiter are ok
 
-        // if (!PerNodeLimit(ctx, stack.front().count)) {
-        //     stack.pop_back();
-        //     continue;
-        // }
+        if (!PerNodeLimit(ctx, stack.front().count)) {
+            stack.pop_back();
+            continue;
+        }
 
         relp_->path_.SetStart(startVid);
         relp_->path_.Append(stack.back().currentEit->GetUid());
