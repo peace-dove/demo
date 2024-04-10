@@ -1,5 +1,5 @@
 ﻿/**
- * Copyright 2022 AntGroup CO., Ltd.
+ * Copyright 2024 AntGroup CO., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,13 +41,18 @@ struct DfsState {
 
     DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
              ExpandTowards expand_direction, bool needNext, bool isMaxHop);
-             
+
     void getTime();
 };
 
 class Predicate {
  public:
     virtual bool eval(std::vector<DfsState> &stack) = 0;
+};
+
+class ValidPredicate : public Predicate {
+ public:
+    bool eval(std::vector<DfsState> &stack) override;
 };
 
 class HeadPredicate : public Predicate {

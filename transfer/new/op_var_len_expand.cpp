@@ -18,7 +18,6 @@
 //
 
 #include "cypher/execution_plan/ops/op_var_len_expand.h"
-#include <cstddef>
 
 namespace cypher {
 
@@ -60,14 +59,18 @@ void DfsState::getTime() {
 }
 
 // Predicate Class
+bool ValidPredicate::eval(std::vector<DfsState> &stack) {
+    return stack.back().currentEit->IsValid();
+}
+
 bool HeadPredicate::eval(std::vector<DfsState> &stack) {
-    if (stack.empty()) {
-        myPrint("head empty");
-        return true;
-    }
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("head empty");
+    //     return true;
+    // }
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     if (stack.size() >= 2) {
         return true;
     }
@@ -92,13 +95,13 @@ bool HeadPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool LastPredicate::eval(std::vector<DfsState> &stack) {
-    if (stack.empty()) {
-        myPrint("last empty");
-        return true;
-    }
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("last empty");
+    //     return true;
+    // }
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     // last timestamp, check every one
     FieldData last = stack.back().timestamp;
     switch (op) {
@@ -120,15 +123,15 @@ bool LastPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
-    if (stack.empty()) {
-        myPrint("asc empty");
-        // length is 0
-        return true;
-    }
-    // length >= 1
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("asc empty");
+    //     // length is 0
+    //     return true;
+    // }
+    // // length >= 1
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     if (stack.size() == 1) {
         return true;
     }
@@ -142,15 +145,15 @@ bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
-    if (stack.empty()) {
-        myPrint("desc empty");
-        // length is 0
-        return true;
-    }
-    // length >= 1
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("desc empty");
+    //     // length is 0
+    //     return true;
+    // }
+    // // length >= 1
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     if (stack.size() == 1) {
         return true;
     }
@@ -165,13 +168,13 @@ bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
 
 bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
     // actually, it can only deal with maxinlist < ...
-    if (stack.empty()) {
-        myPrint("maxinlist empty");
-        return true;
-    }
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("maxinlist empty");
+    //     return true;
+    // }
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     FieldData maxInList;
     if (stack.size() == 1) {
         stack.back().maxTimestamp = stack.back().timestamp;
@@ -203,13 +206,13 @@ bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
 
 bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
     // only deal with minInlist > ...
-    if (stack.empty()) {
-        myPrint("mininlist empty");
-        return true;
-    }
-    if (!stack.back().currentEit->IsValid()) {
-        return false;
-    }
+    // if (stack.empty()) {
+    //     myPrint("mininlist empty");
+    //     return true;
+    // }
+    // if (!stack.back().currentEit->IsValid()) {
+    //     return false;
+    // }
     FieldData minInList;
     if (stack.size() == 1) {
         stack.back().minTimestamp = stack.back().timestamp;
@@ -502,6 +505,7 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
 
 void VarLenExpand::PushDownEdgeFilter(std::shared_ptr<lgraph::Filter> edge_filter) {
     edge_filter_ = edge_filter;
+
     // add filter to local Predicates
     PushFilter(edge_filter);
 }
@@ -520,6 +524,8 @@ OpBase::OpResult VarLenExpand::Initialize(RTContext *ctx) {
     record->values[relp_rec_idx_].relationship = relp_;
     relp_->ItsRef().resize(max_hop_);
     // needPop = false;
+    auto p = std::make_unique<ValidPredicate>();
+    addPredicate(std::move(p));
     return OP_OK;
 }
 
