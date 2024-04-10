@@ -10,7 +10,7 @@ throw lgraph::CypherException(std::to_string((int)(op_filter->filter_->Type())))
 ```
 
 ### cr1
-MATCH p = (acc:Account {id:4616471093031481453})-[e1:transfer *1..3]->(other:Account)<-
+MATCH p = (acc:Account {id:4615345742880441418})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
 head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
@@ -30,46 +30,19 @@ WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 order by len desc
 RETURN path;
 
-MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *1..3]->(other:Account)
-RETURN other.id;
 
 检查什么时候返回
 stack path path_unique同步
 
-my: 0.005307197570800781
-new: 0.0105
-
-my: 1.5668585300445557 0.0166
-
-<!-- use this -->
+<!-- check asc, use this -->
 MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *2..2]->(other:Account)
-WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
+WHERE isDesc(getMemberProp(e1, 'timestamp'))=true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 order by len desc
 RETURN path;
 
-MATCH (acc:Account {id:8725999155939212})-[e1:transfer]->(mid:Account {id:171700010671408982})-[e2:transfer]->(other:Account)
-WHERE e1.timestamp < e2.timestamp
-return e1.timestamp, e2.timestamp, other.id;
-
-+----+-----------------------------------------------------------+
-| id | path                                                      |
-+----+-----------------------------------------------------------+
-| 0  | [8725999155939212,255861028707897460,202099308156163676]  |
-| 1  | [8725999155939212,255861028707897460,4894570019289042920] |
-| 2  | [8725999155939212,255861028707897460,226306156153278388]  |
-| 3  | [8725999155939212,255861028707897460,4770158079582933872] |
-| 4  | [8725999155939212,255861028707897460,4838837973900333835] |
-| 5  | [8725999155939212,171700010671408982,270497727496850066]  |
-| 6  | [8725999155939212,171700010671408982,4865015421612329968] |
-| 7  | [8725999155939212,171700010671408982,4871489071198774281] |
-| 8  | [8725999155939212,171700010671408982,234187455501180702]  |
-| 9  | [8725999155939212,171700010671408982,230247080705145324]  |
-+----+-----------------------------------------------------------+
-
-
 ### cr2
-MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+MATCH (p:Person {id:58203})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
 (other:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
@@ -86,18 +59,26 @@ RETURN otherId, round(sumLoanAmount * 1000) / 1000 as sumLoanAmount,
 round(sumLoanBalance * 1000) / 1000 as sumLoanBalance
 ORDER BY sumLoanAmount DESC, otherId ASC;
 
-  "operationResult" : [ {
-    "otherId" : 4872895071692797812,
-    "sumLoanAmount" : 9.4103294E7,
-    "sumLoanBalance" : 9.4103294E7
-  }, {
-    "otherId" : 4810688826961824290,
-    "sumLoanAmount" : 4.0275519E7,
-    "sumLoanBalance" : 4.0275519E7
-  } ]
+MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+(other:Account)
+WHERE head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
+last(getMemberProp(e2, 'timestamp')) > 1627020616747
+RETURN other;
+
+MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+(other:Account)
+WHERE last(getMemberProp(e2, 'timestamp')) > 1627020616747
+RETURN other;
+
+MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+(other:Account)
+RETURN other;
+
 
 ### cr5
-MATCH (person:Person {id:39324})-[e1:own]->(src:Account)
+check id:32025
+
+MATCH (person:Person {id:8210})-[e1:own]->(src:Account)
 WITH src
 MATCH p=(src)-[e2:transfer*3..3]->(dst:Account)
 WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
@@ -138,31 +119,13 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false 
 RETURN path;
 
-<!-- use this -->
+<!-- last, use this -->
 MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account {id:4687403336918373745})
 WHERE last(getMemberProp(e2, 'timestamp')) > 1659331936801
 WITH relationships(p) as path, length(p) as len
 ORDER BY len DESC 
 RETURN path;
 
-MATCH p=(src:Account {id:4743416582405895609})-[e2:transfer*2..2]->(dst:Account {id:4687403336918373745})
-WITH relationships(p) as path, length(p) as len
-ORDER BY len DESC 
-RETURN path;
-
-match (src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
-where e1.timestamp > 1662123596189
-RETURN e1.timestamp, e2.timestamp;
-
-match (src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
-RETURN e1.timestamp, e2.timestamp;
-
-+----+---------------+---------------+
-| id | e1.timestamp  | e2.timestamp  |
-+----+---------------+---------------+
-| 0  | 1664764621398 | 1659331936802 |
-| 1  | 1662123596189 | 1659331936802 |
-+----+---------------+---------------+
 
 python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgraph.json -u admin -P 73@TuGraph
 
@@ -171,12 +134,6 @@ python3 src/python/FMA_shell/lgraph_shell/lgraph_cypher.py -c /usr/local/etc/lgr
 [4743416582405895609,174795960537326727,258112553643682103]
 
 <!-- where not exec -->
-match p=(src:Account {id:4743416582405895609})-[e:transfer*3..3]->(dst:Account)
-WHERE isAsc(getMemberProp(e, 'timestamp'))=true
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC
-WHERE hasDuplicates(path)=false
-RETURN path;
 
 match p=(src:Account {id:4743416582405895609})-[e:transfer*2..2]->(dst:Account {id:4687403336918373745})
 WHERE isAsc(getMemberProp(e, 'timestamp'))=true
@@ -202,44 +159,12 @@ ORDER BY len DESC
 WHERE hasDuplicates(path)=false
 RETURN path;
 
-<!-- use this -->
-match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC 
-WHERE hasDuplicates(path)=false 
-RETURN path;
-
-match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(:Account)-[e2:transfer]->(dst:Account {id:4687403336918373745})
-where e1.timestamp < e2.timestamp
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
-ORDER BY len DESC 
-WHERE hasDuplicates(path)=false 
-RETURN path;
-
-match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(mid:Account {id:4865576722298321633})-[e2:transfer]->(dst:Account {id:4687403336918373745}) 
-RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
-
-match p=(src:Account {id:4743416582405895609})-[e1:transfer]->(mid:Account {id:174795960537326727})-[e2:transfer]->(dst:Account {id:258112553643682103}) 
-RETURN src.id, e1.timestamp, mid.id, e2.timestamp, dst.id;
-
-  "operationResult" : [ {
-    "path" : [ 4743416582405895609, 4865576722298321633, 4802526327515135661 ]
-  }, {
-    "path" : [ 4743416582405895609, 4865576722298321633, 4878806046203723425 ]
-  }, {
-    "path" : [ 4743416582405895609, 174795960537326727 ]
-  }, {
-    "path" : [ 4743416582405895609, 4865576722298321633 ]
-  }, {
-    "path" : [ 4743416582405895609, 174795960537326727, 297237575406462040 ]
-  } ]
-
 
 ### cr11
 
 id: 31073 58403
 
-MATCH (p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+MATCH (p1:Person {id:8155})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
@@ -264,13 +189,6 @@ RETURN p1;
 MATCH p=(p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path
 RETURN path;
-
-  "operationResult" : [ {
-    "sumLoanAmount" : 3.8567769E7,
-    "numLoans" : 1
-  } ]
-
-( ( {isasc(false,getMemberProp(false,e1,timestamp)) = true} && {head(false,getMemberProp(false,e1,timestamp)) > 90} ) && {last(false,getMemberProp(false,e1,timestamp)) < 120})
 
 
 
