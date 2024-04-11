@@ -127,9 +127,6 @@ class VarLenExpand : public OpBase {
     // stack for DFS
     std::vector<DfsState> stack;
 
-    // this flag decides whether need to pop relp_->Path
-    bool needPop;
-
  public:
     cypher::PatternGraph *pattern_graph_ = nullptr;
     cypher::Node *start_ = nullptr;         // start node to expand

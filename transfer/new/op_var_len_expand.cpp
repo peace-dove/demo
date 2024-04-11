@@ -21,8 +21,6 @@
 
 namespace cypher {
 
-void myPrint(std::string s) { std::cout << s << std::endl; }
-
 // DFS State Class
 DfsState::DfsState(RTContext *ctx, lgraph::VertexId id, int level, cypher::Relationship *relp,
                    ExpandTowards expand_direction, bool needNext, bool isMaxHop)
@@ -53,24 +51,15 @@ void DfsState::getTime() {
         return;
     }
     timestamp = lgraph::FieldData(currentEit->GetField("timestamp"));
-    // std::cout << "Now edge is: " + currentEit->GetUid().ToString() +
-    //                  ", timestamp is:" + timestamp.ToString()
-    //           << std::endl;
 }
 
 // Predicate Class
 bool ValidPredicate::eval(std::vector<DfsState> &stack) {
+    // every eiter in stack must be valid
     return stack.back().currentEit->IsValid();
 }
 
 bool HeadPredicate::eval(std::vector<DfsState> &stack) {
-    // if (stack.empty()) {
-    //     myPrint("head empty");
-    //     return true;
-    // }
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     if (stack.size() >= 2) {
         return true;
     }
@@ -95,13 +84,6 @@ bool HeadPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool LastPredicate::eval(std::vector<DfsState> &stack) {
-    // if (stack.empty()) {
-    //     myPrint("last empty");
-    //     return true;
-    // }
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     // last timestamp, check every one
     FieldData last = stack.back().timestamp;
     switch (op) {
@@ -123,15 +105,6 @@ bool LastPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
-    // if (stack.empty()) {
-    //     myPrint("asc empty");
-    //     // length is 0
-    //     return true;
-    // }
-    // // length >= 1
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     if (stack.size() == 1) {
         return true;
     }
@@ -145,15 +118,6 @@ bool IsAscPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
-    // if (stack.empty()) {
-    //     myPrint("desc empty");
-    //     // length is 0
-    //     return true;
-    // }
-    // // length >= 1
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     if (stack.size() == 1) {
         return true;
     }
@@ -168,13 +132,6 @@ bool IsDescPredicate::eval(std::vector<DfsState> &stack) {
 
 bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
     // actually, it can only deal with maxinlist < ...
-    // if (stack.empty()) {
-    //     myPrint("maxinlist empty");
-    //     return true;
-    // }
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     FieldData maxInList;
     if (stack.size() == 1) {
         stack.back().maxTimestamp = stack.back().timestamp;
@@ -206,13 +163,6 @@ bool MaxInListPredicate::eval(std::vector<DfsState> &stack) {
 
 bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
     // only deal with minInlist > ...
-    // if (stack.empty()) {
-    //     myPrint("mininlist empty");
-    //     return true;
-    // }
-    // if (!stack.back().currentEit->IsValid()) {
-    //     return false;
-    // }
     FieldData minInList;
     if (stack.size() == 1) {
         stack.back().minTimestamp = stack.back().timestamp;
@@ -253,15 +203,10 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto &currentEit = currentState.currentEit;
         auto currentLevel = currentState.level;  // actually, is the path length in stack
 
-        // TODO
         // the part of count, needs check
         auto &currentCount = currentState.count;
-
         if (!PerNodeLimit(ctx, currentCount)) {
             stack.pop_back();
-            if (relp_->path_.Length() != 0) {
-                needPop = true;
-            }
             continue;
         }
 
@@ -313,9 +258,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 isFinding = false;
 
                 // add edge's euid to path
-                // myPrint(relp_->path_.ToString());
-                // myPrint(stack.back().currentEit->GetUid().ToString());
-                // myPrint("Before append");
                 relp_->path_.Append(currentEit->GetUid());
 
                 if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
@@ -385,9 +327,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 isFinding = false;
 
                 // add edge's euid to path
-                // myPrint(relp_->path_.ToString());
-                // myPrint(stack.back().currentEit->GetUid().ToString());
-                // myPrint("Before append");
                 relp_->path_.Append(stack.back().currentEit->GetUid());
 
                 if (ctx->path_unique_ &&
@@ -505,7 +444,6 @@ void VarLenExpand::PushFilter(std::shared_ptr<lgraph::Filter> filter) {
 
 void VarLenExpand::PushDownEdgeFilter(std::shared_ptr<lgraph::Filter> edge_filter) {
     edge_filter_ = edge_filter;
-
     // add filter to local Predicates
     PushFilter(edge_filter);
 }
@@ -523,7 +461,7 @@ OpBase::OpResult VarLenExpand::Initialize(RTContext *ctx) {
     record->values[relp_rec_idx_].type = Entry::VAR_LEN_RELP;
     record->values[relp_rec_idx_].relationship = relp_;
     relp_->ItsRef().resize(max_hop_);
-    // needPop = false;
+
     auto p = std::make_unique<ValidPredicate>();
     addPredicate(std::move(p));
     return OP_OK;
@@ -586,7 +524,6 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
         // when reach here, the first node and eiter are ok
-
         if (!PerNodeLimit(ctx, stack.front().count)) {
             stack.pop_back();
             continue;
@@ -606,10 +543,6 @@ OpBase::OpResult VarLenExpand::ResetImpl(bool complete) {
     std::vector<DfsState>().swap(stack);
     // stack.clear();
     relp_->path_.Clear();
-
-    // std::queue<lgraph::VertexId>().swap(frontier_buffer_);
-    // std::queue<Path>().swap(path_buffer_);
-    // TODO(anyone) reset modifies
     return OP_OK;
 }
 
