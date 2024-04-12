@@ -237,7 +237,7 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
         auto &currentEit = currentState.currentEit;
         auto currentLevel = currentState.level;
 
-        // TODO the part of count, needs check
+        // the part of count, needs check
         auto &currentCount = currentState.count;
         if (!PerNodeLimit(ctx, currentCount)) {
             stack.pop_back();
@@ -263,6 +263,9 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     relp_->path_.GetNthEdgeWithTid(relp_->path_.Length() - 1)));
             }
             stack.pop_back();
+
+            neighbor_->PushVid(currentNodeId);
+
             // check label
             if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                 neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
@@ -271,8 +274,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                 }
                 continue;
             }
-
-            neighbor_->PushVid(currentNodeId);
 
             if (relp_->path_.Length() != 0) {
                 needPop = true;
@@ -285,15 +286,15 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
             needNext = true;
 
             // check predicates here, path derived from eiters in stack
-            bool ok = true;
+            bool passPredicate = true;
             for (auto &p : predicates) {
                 if (!p->eval(relp_->ItsRef())) {
-                    ok = false;
+                    passPredicate = false;
                     break;
                 }
             }
 
-            if (ok) {
+            if (passPredicate) {
                 // check path unique
                 if (ctx->path_unique_ && pattern_graph_->VisitedEdges().Contains(*currentEit)) {
                     currentEit->Next();
@@ -317,6 +318,8 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
             stack.pop_back();
             if (currentLevel >= min_hop_) {
+                neighbor_->PushVid(currentNodeId);
+
                 // check label
                 if (!neighbor_->Label().empty() && neighbor_->IsValidAfterMaterialize(ctx) &&
                     neighbor_->ItRef()->GetLabel() != neighbor_->Label()) {
@@ -325,8 +328,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
                     }
                     continue;
                 }
-
-                neighbor_->PushVid(currentNodeId);
 
                 if (relp_->path_.Length() != 0) {
                     needPop = true;
@@ -471,10 +472,6 @@ OpBase::OpResult VarLenExpand::ResetImpl(bool complete) {
     std::vector<DfsState>().swap(stack);
     // stack.clear();
     relp_->path_.Clear();
-
-    // std::queue<lgraph::VertexId>().swap(frontier_buffer_);
-    // std::queue<Path>().swap(path_buffer_);
-    // TODO(anyone) reset modifies
     return OP_OK;
 }
 
