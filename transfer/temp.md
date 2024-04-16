@@ -10,7 +10,7 @@ throw lgraph::CypherException(std::to_string((int)(op_filter->filter_->Type())))
 ```
 
 ### cr1
-MATCH p = (acc:Account {id:4615345742880441418})-[e1:transfer *1..3]->(other:Account)<-
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
 head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
@@ -24,12 +24,63 @@ medium.id as mediumId,
 medium.type as mediumType
 ORDER BY accountDistance, otherId, mediumId;
 
-MATCH p = (acc:Account {id:8725999155939212})-[e1:transfer *1..3]->(other:Account)
-WHERE isAsc(getMemberProp(e1, 'timestamp'))=true
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
+[e2:signIn]-(medium)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640 AND
+e2.timestamp > 1627020616747 AND
+e2.timestamp < 1669690342640 AND
+medium.isBlocked = true
+with distinct other.id as id
+RETURN DISTINCT count(id);
+
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
+[e2:signIn]-(medium)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640 AND
+e2.timestamp > 1627020616747 AND
+e2.timestamp < 1669690342640 AND
+medium.isBlocked = true
 WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 order by len desc
 RETURN path;
 
+
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
+[e2:signIn]-(medium)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640 AND
+e2.timestamp > 1627020616747 AND
+e2.timestamp < 1669690342640 AND
+medium.isBlocked = true
+WITH getMemberProp(nodes(p), 'id') as path, length(p) as len
+order by len desc
+RETURN path;
+
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640
+WITH getMemberProp(nodes(p), 'id') as path, length(p) as len
+order by len desc
+RETURN path;
+
+MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)
+WHERE head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640
+WITH getMemberProp(nodes(p), 'id') as path, length(p) as len
+order by len desc
+RETURN path;
+
+<!-- pure -->
+MATCH (acc:Account {id:4626605016826793378})-[e1:transfer *1..4]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640
+RETURN count(acc);
 
 检查什么时候返回
 stack path path_unique同步
@@ -42,7 +93,7 @@ order by len desc
 RETURN path;
 
 ### cr2
-MATCH (p:Person {id:58203})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
+MATCH (p:Person {id:572153})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
 (other:Account)
 WHERE isDesc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
@@ -78,9 +129,9 @@ RETURN other;
 ### cr5
 check id:32025
 
-MATCH (person:Person {id:8210})-[e1:own]->(src:Account)
+MATCH (person:Person {id:524333})-[e1:own]->(src:Account)
 WITH src
-MATCH p=(src)-[e2:transfer*3..3]->(dst:Account)
+MATCH p=(src)-[e2:transfer*1..3]->(dst:Account)
 WHERE isAsc(getMemberProp(e2, 'timestamp'))=true AND
 head(getMemberProp(e2, 'timestamp')) > 1627020616747 AND
 last(getMemberProp(e2, 'timestamp')) < 1669690342640
@@ -164,7 +215,7 @@ RETURN path;
 
 id: 31073 58403
 
-MATCH (p1:Person {id:8155})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+MATCH (p1:Person {id:188648})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
@@ -235,3 +286,122 @@ iterator.h 有两处修改
 scheduler.cpp
 state_machine.cpp
 runtime_context.h
+
+4.12
+寻找max时间，分析原因
+
+注意使用benchmark的数据测试，先跑出自己实现的结果my1 my2 my5 my11
+再找到其中开销最大的时间
+
+
+after.txt是运行自己的实现
+old.txt是原来的实现
+
+主要问题在cr1，max运行时间优化很少
+cr1
+
+edgecount pathcount spacecount
+10936 5699 592310
+2689 1493 154932
+10382 6133 637548
+
+after1.txt
+4626888965704655708 0.2058720588684082
+4626329589164019088 0.25562000274658203
+12669672486865881 time spent: 0.35648155212402344
+4622108564024989084 time spent: 0.5616426467895508
+4626605016826793378 time spent: 0.6526474952697754 44s
+
+old1
+4626888965704655708 0.21819281578063965
+4626329589164019088 0.2729661464691162
+0.5249123573303223 12669672486865881 time spent: 0.48700475692749023
+0.5794200897216797 4622108564024989084 time spent: 0.5761604309082031 17s
+0.7588093280792236 4626605016826793378 time spent: 0.7418525218963623 67s
+
+edgecount pathcount spacecount resultpathcount 228
+21594 17458 1716980
+3457 2958 297606
+15308 12992 1303782
+
+cr2
+edgecount pathcount
+2196 855
+2754 978
+29752 17382
+
+after2.txt
+0.08237075805664062 58605 time spent: 0.08237075805664062
+0.08308672904968262 343909 time spent: 0.08308672904968262
+0.9110314846038818 572153 time spent: 0.9110314846038818
+
+old2
+0.07891702651977539 58605 time spent: 0.07891702651977539
+0.08574938774108887 343909 time spent: 0.08574938774108887
+0.9342560768127441 572153 time spent: 0.9342560768127441
+
+edgecount pathcount
+5994 4714
+4413 3648
+35698 29885
+
+
+cr5
+edgecount pathcount
+5088 3401
+8705 4121
+9104 4936
+
+after5
+0.1695249080657959 261070 time spent: 0.1695249080657959
+0.2139873504638672 174552 time spent: 0.2139873504638672
+0.257296085357666 524333 time spent: 0.257296085357666
+
+old5
+0.1698470115661621 261070 time spent: 0.1698470115661621
+0.20034217834472656 174552 time spent: 0.20034217834472656
+0.2596423625946045 524333 time spent: 0.2596423625946045
+
+edgecount pathcount
+6626 5602
+14113 12079
+16726 13176
+
+
+
+cr11
+
+edgecount pathcount
+11 9
+13 13
+14 13
+
+after11
+0.0008559226989746094 459442 time spent: 0.0008559226989746094
+0.0008862018585205078 314024 time spent: 0.0008862018585205078
+0.0009596347808837891 188648 time spent: 0.0009596347808837891
+
+old11
+0.0008983612060546875 459442 time spent: 0.0008983612060546875
+0.001005411148071289 314024 time spent: 0.001005411148071289
+0.0010445117950439453 188648 time spent: 0.0010445117950439453
+
+edgecount pathcount
+32 11
+46 13
+53 16
+
+
+
+
+
+
+
+
+
+
+
+
+4.17
+空间开销指标评估思路
+    重写allocator
