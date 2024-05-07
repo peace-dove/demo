@@ -42,6 +42,7 @@ struct DfsState {
 class Predicate {
  public:
     virtual bool eval(std::vector<lgraph::EIter> &eits) = 0;
+    virtual ~Predicate() = default;
 };
 
 class HeadPredicate : public Predicate {

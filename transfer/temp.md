@@ -24,6 +24,34 @@ medium.id as mediumId,
 medium.type as mediumType
 ORDER BY accountDistance, otherId, mediumId;
 
+Produce Results                                                    
+  Distinct                                           
+    Expand(All) [other <-- medium EdgeFilter e2 & medium]
+      Filter [ isAsc && head && last ]
+        Variable Length Expand(All) [acc -->*1..3 other]
+          Node Index Seek [acc]  IN []
+
+Produce Results                                                    
+  Distinct                                           
+    Expand(All) [other <-- medium EdgeFilter e2 & medium]
+      Variable Length Expand(All) [acc -->*1..3 other VarLenEdgeFilter isAsc && head && last]
+        Node Index Seek [acc]  IN []
+
+Produce Results                       
+  Sort [{<3>: 1:1, 0:1, 2:1}]                               
+    Distinct                                           
+      Project [ ... ]
+        Filter [ Filter... ]
+          Expand(All) [other <-- medium EdgeFilter...]
+            Variable Length Expand(All) [acc -->*1..3 other VarLenEdgeFilter...]
+              Node Index Seek [acc]  IN []
+
+
+Produce Results
+  Aggregate [count(acc)]
+    Variable Length Expand(All) [acc -->*1..3 other VarLenEdgeFilter...]
+      Node Index Seek [acc]  IN []
+
 MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
@@ -75,8 +103,23 @@ WITH getMemberProp(nodes(p), 'id') as path, length(p) as len
 order by len desc
 RETURN path;
 
-<!-- pure -->
+<!-- pure var len expand -->
+<!-- 3hop -->
+MATCH (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640
+RETURN count(acc);
+
+<!-- 4hop -->
 MATCH (acc:Account {id:4626605016826793378})-[e1:transfer *1..4]->(other:Account)
+WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
+head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
+last(getMemberProp(e1, 'timestamp')) < 1669690342640
+RETURN count(acc);
+
+<!-- 5hop -->
+MATCH (acc:Account {id:4626605016826793378})-[e1:transfer *1..5]->(other:Account)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
 head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
 last(getMemberProp(e1, 'timestamp')) < 1669690342640
@@ -110,6 +153,25 @@ RETURN otherId, round(sumLoanAmount * 1000) / 1000 as sumLoanAmount,
 round(sumLoanBalance * 1000) / 1000 as sumLoanBalance
 ORDER BY sumLoanAmount DESC, otherId ASC;
 
+|    | Produce Results                                                                                                                                                                                                                                                                                                |
+|    |     Sort [{<2>: 1:0, 0:1}]                                                                                                                                                                                                                                                                                     |
+|    |         Project [otherId,sumLoanAmount,sumLoanBalance]                                                                                                                                                                                                                                                         |
+|    |             Apply                                                                                                                                                                                                                                                                                              |
+|    |                 Argument [otherId,sumLoanAmount,sumLoanBalance]                                                                                                                                                                                                                                                |
+|    |                 Aggregate [otherId,sumLoanAmount,sumLoanBalance]                                                                                                                                                                                                                                               |
+|    |                     Apply                                                                                                                                                                                                                                                                                      |
+|    |                         Argument [otherId,loanAmount,loanBalance]                                                                                                                                                                                                                                              |
+|    |                         Distinct                                                                                                                                                                                                                                                                               |
+|    |                             Project [otherId,loanAmount,loanBalance]                                                                                                                                                                                                                                           |
+|    |                                 Apply                                                                                                                                                                                                                                                                          |
+|    |                                     Expand(All) [other <-- loan EdgeFilter (({e3.timestamp > 1627020616747}&&{e3.timestamp < 1669690342640}))]                                                                                                                                                                 |
+|    |                                         Argument [other]                                                                                                                                                                                                                                                       |
+|    |                                     Distinct                                                                                                                                                                                                                                                                   |
+|    |                                         Project [other]                                                                                                                                                                                                                                                        |
+|    |                                             Variable Length Expand(All) [acc <--*1..3 other VarLenEdgeFilter ((({isdesc(false,getmemberprop(false,e2,timestamp)) = true}&&{head(false,getmemberprop(false,e2,timestamp)) < 1669690342640})&&{last(false,getmemberprop(false,e2,timestamp)) > 1627020616747}))] |
+|    |                                                 Expand(All) [p --> acc ]                                                                                                                                                                                                                                       |
+|    |                                                     Node Index Seek [p]  IN []
+
 MATCH (p:Person {id:19395})-[e1:own]->(acc:Account) <-[e2:transfer*1..3]-
 (other:Account)
 WHERE head(getMemberProp(e2, 'timestamp')) < 1669690342640 AND
@@ -139,6 +201,21 @@ WITH DISTINCT getMemberProp(nodes(p), 'id') as path, length(p) as len
 ORDER BY len DESC 
 WHERE hasDuplicates(path)=false 
 RETURN path;
+
+|    | Produce Results                                                                                                                                                                                                                                                                                 |
+|    |     Project [path]                                                                                                                                                                                                                                                                              |
+|    |         Apply                                                                                                                                                                                                                                                                                   |
+|    |             Argument [path,len]                                                                                                                                                                                                                                                                 |
+|    |             Sort [{<1>: 1:0}]                                                                                                                                                                                                                                                                   |
+|    |                 Distinct                                                                                                                                                                                                                                                                        |
+|    |                     Filter [{hasduplicates(false,path) = false}]                                                                                                                                                                                                                                |
+|    |                         Project [path,len]                                                                                                                                                                                                                                                      |
+|    |                             Apply                                                                                                                                                                                                                                                               |
+|    |                                 Variable Length Expand(All) [src -->*1..3 dst VarLenEdgeFilter ((({isasc(false,getmemberprop(false,e2,timestamp)) = true}&&{head(false,getmemberprop(false,e2,timestamp)) > 1627020616747})&&{last(false,getmemberprop(false,e2,timestamp)) < 1669690342640}))] |
+|    |                                     Argument [src]                                                                                                                                                                                                                                              |
+|    |                                 Project [src]                                                                                                                                                                                                                                                   |
+|    |                                     Expand(All) [person --> src ]                                                                                                                                                                                                                               |
+|    |                                         Node Index Seek [person]  IN []
 
 MATCH (person:Person {id:32025})-[e1:own]->(src:Account)
 WITH src
@@ -213,33 +290,38 @@ RETURN path;
 
 ### cr11
 
-id: 31073 58403
-
-MATCH (p1:Person {id:188648})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
+MATCH (p1:Person {id:256946})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
 WITH DISTINCT loan
 WITH sum(loan.loanAmount) as sumLoanAmount, count(distinct loan) as numLoans
 RETURN round(sumLoanAmount * 1000) / 1000 as sumLoanAmount, numLoans;
 
-MATCH p=(p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person)
+|    | Produce Results                                                                                                                                                                                                                                  |
+|    |     Project [sumLoanAmount,numLoans]                                                                                                                                                                                                             |
+|    |         Apply                                                                                                                                                                                                                                    |
+|    |             Argument [sumLoanAmount,numLoans]                                                                                                                                                                                                    |
+|    |             Aggregate [sumLoanAmount,numLoans]                                                                                                                                                                                                   |
+|    |                 Apply                                                                                                                                                                                                                            |
+|    |                     Argument [loan]                                                                                                                                                                                                              |
+|    |                     Distinct                                                                                                                                                                                                                     |
+|    |                         Project [loan]                                                                                                                                                                                                           |
+|    |                             Expand(All) [pN --> loan ]                                                                                                                                                                                           |
+|    |                                 Variable Length Expand(All) [p1 -->*1..5 pN VarLenEdgeFilter (({mininlist(false,getmemberprop(false,edge,timestamp)) > 1627020616747}&&{maxinlist(false,getmemberprop(false,edge,timestamp)) < 1669690342640}))] |
+|    |                                     Node Index Seek [p1]  IN []
+
+MATCH (p1:Person {id:256946})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
 WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
 maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path
-return path;
+return count(loan);
 
-MATCH p=(p1:Person {id:58403})-[edge:guarantee*1..5]->(pN:Person)
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path
-return path;
+MATCH (p1:Person {id:375587})-[edge:guarantee*1..5]->(pN:Person)
+WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747 AND
+maxInList(getMemberProp(edge, 'timestamp')) < 1669690342640
+return count(p1);
 
-MATCH (p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person)
-WHERE minInList(getMemberProp(edge, 'timestamp')) > 1627020616747
-RETURN p1;
-
-
-MATCH p=(p1:Person {id:76694})-[edge:guarantee*1..5]->(pN:Person) -[:apply]->(loan:Loan)
-WITH DISTINCT getMemberProp(nodes(p), 'id') as path
-RETURN path;
+MATCH (p1:Person {id:375587})-[edge:guarantee*1..5]->(pN:Person)
+return count(p1);
 
 
 
