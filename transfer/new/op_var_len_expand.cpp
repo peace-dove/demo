@@ -192,10 +192,6 @@ bool MinInListPredicate::eval(std::vector<DfsState> &stack) {
 }
 
 // VarLenExpand Class
-bool VarLenExpand::PerNodeLimit(RTContext *ctx, size_t count) {
-    return !ctx->per_node_limit_.has_value() || count <= ctx->per_node_limit_.value();
-}
-
 bool VarLenExpand::NextWithFilter(RTContext *ctx) {
     while (!stack.empty()) {
         auto &currentState = stack.back();
@@ -205,10 +201,6 @@ bool VarLenExpand::NextWithFilter(RTContext *ctx) {
 
         // the part of count, needs check
         auto &currentCount = currentState.count;
-        if (!PerNodeLimit(ctx, currentCount)) {
-            stack.pop_back();
-            continue;
-        }
 
         // if needNext is true, the back currentEit next, then set needNext to false
         auto &needNext = currentState.needNext;
@@ -524,10 +516,6 @@ OpBase::OpResult VarLenExpand::RealConsume(RTContext *ctx) {
             continue;
         }
         // when reach here, the first node and eiter are ok
-        if (!PerNodeLimit(ctx, stack.front().count)) {
-            stack.pop_back();
-            continue;
-        }
 
         relp_->path_.SetStart(startVid);
         relp_->path_.Append(stack.back().currentEit->GetUid());
