@@ -9,8 +9,64 @@ throw lgraph::CypherException(temp);
 throw lgraph::CypherException(std::to_string((int)(op_filter->filter_->Type())));
 ```
 
+### Test Code
+cypher 8 9 11 21
+
+input id for cr1 use
+2251799813685615
+4614220667607332302
+4614782243171217523
+
+
+MATCH p = (acc:Account {id:2251799813685615})-[*1..2]->() return count(p);
+MATCH p = (acc:Account {id:4614220667607332302})-[*1..2]->() return count(p);
+MATCH p = (acc:Account {id:4614782243171217523})-[*1..2]->() return count(p);
+
+MATCH p = (acc:Account {id:4614220667607332302})-[*2..2]->() return count(p);
+MATCH p = (acc:Account {id:4614220667607332302})-[*0..1]->()-[]->() return count(p);
+
+MATCH p = (acc:Account {id:2251799813685615})-[]->()-[*0..1]->(other) return other;
+MATCH p = (acc:Account {id:4614220667607332302})-[]->()-[*0..1]->(other) return other;
+
+MATCH p = (acc{id:4614220667607332302})-[*0..1]->()-[]->() RETURN count(p);
+
+8
+MATCH (n:Film)<-[:ACTED_IN*0..]-(m:Person) RETURN n.title,n,m
+MATCH ()-[r]->() WHERE type(r) = 'ACTED_IN' RETURN r,type(r)
+MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]->() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]->(m) RETURN p,m
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name
+
+9
+MATCH (mic:Person {name:'Michael Redgrave'})-[]->()-[*0..1]->(m) RETURN DISTINCT m
+
+11
+MATCH (a:Person) WHERE a.birthyear < 1960 OR a.birthyear >= 1970 RETURN a.name
+MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]-() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[*1..2]->() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[*0..1]->()-[]->() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]-() RETURN p,length(p)
+MATCH (n:Person)-[]->(m:Film) WITH n.name AS nname, collect(id(m)) AS mc
+	MATCH (n:Person {name: nname})<-[]-(o) WITH n.name AS nname, mc, collect(id(o)) AS oc
+	UNWIND mc+oc AS c RETURN c
+
+21
+MATCH (n) RETURN coalesce(n.birthyear, n.name)
+MATCH (n) RETURN CASE n.name WHEN null THEN false ELSE true END AS hasName
+MATCH p = (n {name:'Rachel Kempson'})-[*0..3]->() RETURN p,length(p)
+MATCH (n) RETURN n.name, "
+         "CASE WHEN n.birthyear IS NULL THEN -1 "
+         "ELSE n.birthyear + 10 END AS birth_10_years_later
+MATCH (n) RETURN exists(n.name) AS has_name,exists(n.title) AS has_title,label(n)
+MATCH (n) RETURN n,CASE exists(n.name) WHEN true THEN n.name ELSE n.title END AS content
+MATCH (n) RETURN n,n.name AS name ORDER BY name
+
+
 ### cr1
-MATCH p = (acc:Account {id:4626605016826793378})-[e1:transfer *1..3]->(other:Account)<-
+sf1 2251799813685615
+sf10 4626605016826793378
+MATCH p = (acc:Account {id:2251799813685615})-[e1:transfer *1..3]->(other:Account)<-
 [e2:signIn]-(medium)
 WHERE isAsc(getMemberProp(e1, 'timestamp'))=true AND
 head(getMemberProp(e1, 'timestamp')) > 1627020616747 AND
