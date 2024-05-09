@@ -22,6 +22,7 @@ MATCH p = (acc:Account {id:2251799813685615})-[*1..2]->() return count(p);
 MATCH p = (acc:Account {id:4614220667607332302})-[*1..2]->() return count(p);
 MATCH p = (acc:Account {id:4614782243171217523})-[*1..2]->() return count(p);
 
+MATCH p = (acc:Account {id:2251799813685615})-[*2..2]->() return count(p);
 MATCH p = (acc:Account {id:4614220667607332302})-[*2..2]->() return count(p);
 MATCH p = (acc:Account {id:4614220667607332302})-[*0..1]->()-[]->() return count(p);
 
@@ -30,37 +31,225 @@ MATCH p = (acc:Account {id:4614220667607332302})-[]->()-[*0..1]->(other) return 
 
 MATCH p = (acc{id:4614220667607332302})-[*0..1]->()-[]->() RETURN count(p);
 
+personid: 32025
+MATCH (n:Company)<-[:invest*0..3]-(m:Person{id:32025}) RETURN n,m;
+MATCH (n:Account {id:4614220667607332302})-[*2]-(m:Account) RETURN DISTINCT m.email ORDER BY m.email;
+
 8
+
+#12 4924.1 Expected equality of these values:
+#12 4924.1   ctx->result_->Size()
+#12 4924.1     Which is: 6
+#12 4924.1   check[i]
+#12 4924.1     Which is: 7
+#12 4924.1 test/test_cypher.cpp:125: Failure
+#12 4924.1 Expected equality of these values:
+#12 4924.1   ctx->result_->Size()
+#12 4924.1     Which is: 9
+#12 4924.1   check[i]
+#12 4924.1     Which is: 13
+#12 4924.1 test/test_cypher.cpp:125: Failure
+#12 4924.1 Expected equality of these values:
+#12 4924.1   ctx->result_->Size()
+#12 4924.1     Which is: 5
+#12 4924.1   check[i]
+#12 4924.1     Which is: 13
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 5
+#12 4924.2   check[i]
+#12 4924.2     Which is: 6
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 4
+#12 4924.2   check[i]
+#12 4924.2     Which is: 15
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 4
+#12 4924.2   check[i]
+#12 4924.2     Which is: 7
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 4
+#12 4924.2   check[i]
+#12 4924.2     Which is: 6
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 1
+#12 4924.2   check[i]
+#12 4924.2     Which is: 3
+#12 4924.2 test/test_cypher.cpp:125: Failure
+#12 4924.2 Expected equality of these values:
+#12 4924.2   ctx->result_->Size()
+#12 4924.2     Which is: 1
+#12 4924.2   check[i]
+#12 4924.2     Which is: 12
+
+
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..]->(n)-[:ACTED_IN]->(m) RETURN n,m
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*1..5]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*1..2]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*2..5]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*1..]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*2..]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..2]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..3]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*1]->(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*2]->(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[*..]->(n) RETURN DISTINCT n,n.name,n.title
+MATCH (van:Person {name:'Vanessa Redgrave'})-[*3]->(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[*2..]->(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[]->()-[*0]->(m) RETURN m
+MATCH (van:Person {name:'Vanessa Redgrave'})-[]->()-[*0..1]->(m) RETURN DISTINCT m
+MATCH (mic:Person {name:'Michael Redgrave'})-[]->()-[*0..1]->(m) RETURN DISTINCT m
+MATCH (jem:Person {name:'Jemma Redgrave'})<-[:HAS_CHILD*..]-(a) RETURN a
+MATCH (jem:Person {name:'Jemma Redgrave'})<-[:HAS_CHILD*..]-(a)-[:ACTED_IN*..]->(m) RETURN a,m
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD|MARRIED*..]->(n) RETURN DISTINCT n.name
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD|MARRIED*1..2]->(n) RETURN DISTINCT n.name
+MATCH (liam:Person {name:'Liam Neeson'})<-[:HAS_CHILD|MARRIED*1..3]-(a) RETURN DISTINCT a.name
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..]-(n) RETURN n
+MATCH (roy:Person {name:'Roy Redgrave'})-[:HAS_CHILD*..]-(n) RETURN DISTINCT n
+MATCH (jem:Person {name:'Jemma Redgrave'})-[:HAS_CHILD*..]-(a) RETURN a
+MATCH (jem:Person {name:'Jemma Redgrave'})-[:HAS_CHILD*..]-(a) RETURN DISTINCT a
+MATCH (van:Person {name:'Vanessa Redgrave'})-[:HAS_CHILD*..]-(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[:HAS_CHILD*..]-(n) RETURN DISTINCT n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[:HAS_CHILD*1..2]-(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[:HAS_CHILD*2]-(n) RETURN n
+MATCH (van:Person {name:'Vanessa Redgrave'})-[:HAS_CHILD*2..]-(n) RETURN n
+MATCH (n:Person)-[:BORN_IN*0..]->(m) RETURN n.name,m.name
+MATCH (n:Person)-[:BORN_IN*0..]->(m:City) RETURN n.name,m.name
+MATCH (n:Person)-[:BORN_IN*0..]->(m:Person) RETURN n.name,m.name
+MATCH (n:Film)<-[:ACTED_IN*0..]-(m) RETURN n.title,n,m
 MATCH (n:Film)<-[:ACTED_IN*0..]-(m:Person) RETURN n.title,n,m
-MATCH ()-[r]->() WHERE type(r) = 'ACTED_IN' RETURN r,type(r)
-MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]->() RETURN p
-MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]->(m) RETURN p,m
-MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name
-MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name
+MATCH (n:Film)<-[:ACTED_IN*0..]-(m:Film) RETURN n.title,n,m
+MATCH (n:Film)<-[:ACTED_IN*0..]-(m:City) RETURN n.title,n,m
 
 9
-MATCH (mic:Person {name:'Michael Redgrave'})-[]->()-[*0..1]->(m) RETURN DISTINCT m
+
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 0
+#12 4925.6   check[i]
+#12 4925.6     Which is: 1
+#12 4925.6 test/test_cypher.cpp:125: Failure
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 5
+#12 4925.6   check[i]
+#12 4925.6     Which is: 6
+#12 4925.6 test/test_cypher.cpp:125: Failure
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 3
+#12 4925.6   check[i]
+#12 4925.6     Which is: 4
+#12 4925.6 test/test_cypher.cpp:125: Failure
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 4
+#12 4925.6   check[i]
+#12 4925.6     Which is: 5
+#12 4925.6 test/test_cypher.cpp:125: Failure
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 2
+#12 4925.6   check[i]
+#12 4925.6     Which is: 3
+#12 4925.6 test/test_cypher.cpp:125: Failure
+#12 4925.6 Expected equality of these values:
+#12 4925.6   ctx->result_->Size()
+#12 4925.6     Which is: 9
+#12 4925.6   check[i]
+#12 4925.6     Which is: 10
+
+From this
+MATCH (n1:Person {name:'Liam Neeson'})-[*3]->(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})-[*..]->(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})-[*2..3]->(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})-[:MARRIED*..]->(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})-[:MARRIED|ACTED_IN*..]->(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})-[:MARRIED|ACTED_IN*2..]->(n2) RETURN n2
+MATCH (n1:Person {name:'Michael Redgrave'})-[*3]->(n2) RETURN n2
+To this
+MATCH (n1:Person {name:'Liam Neeson'})<-[*2]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[*4]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[*..]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[*..]-(n2) RETURN DISTINCT n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[:MARRIED*..]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[:MARRIED|HAS_CHILD*..]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[:MARRIED|HAS_CHILD*2..4]-(n2) RETURN n2
+MATCH (n1:Person {name:'Liam Neeson'})<-[:MARRIED|HAS_CHILD*2..4]-(n2) RETURN DISTINCT n2
 
 11
-MATCH (a:Person) WHERE a.birthyear < 1960 OR a.birthyear >= 1970 RETURN a.name
-MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]-() RETURN p
+#12 4929.0 Expected equality of these values:
+#12 4929.0   ctx->result_->Size()
+#12 4929.0     Which is: 17
+#12 4929.0   check[i]
+#12 4929.0     Which is: 20
+#12 4929.1 test/test_cypher.cpp:125: Failure
+#12 4929.1 Expected equality of these values:
+#12 4929.1   ctx->result_->Size()
+#12 4929.1     Which is: 34
+#12 4929.1   check[i]
+#12 4929.1     Which is: 51
+
+
 MATCH p = (n {name:'Rachel Kempson'})-[*1..2]->() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})<-[*1..2]-() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[*1..2]-() RETURN p this
+MATCH p = (n {name:'Rachel Kempson'})-[*0..1]-() RETURN p
+MATCH p = (n {name:'Rachel Kempson'})-[*2..3]-() RETURN p this
 MATCH p = (n {name:'Rachel Kempson'})-[*0..1]->()-[]->() RETURN p
-MATCH p = (n {name:'Rachel Kempson'})-[]->()-[]-() RETURN p,length(p)
-MATCH (n:Person)-[]->(m:Film) WITH n.name AS nname, collect(id(m)) AS mc
-	MATCH (n:Person {name: nname})<-[]-(o) WITH n.name AS nname, mc, collect(id(o)) AS oc
-	UNWIND mc+oc AS c RETURN c
+MATCH p = (n {name:'Rachel Kempson'})-[*0..3]->() RETURN p,length(p)
+MATCH (n {name:'Rachel Kempson'}) RETURN exists((n)-[*3]->())
+MATCH (n {name:'Rachel Kempson'}) RETURN exists((n)-[:MARRIED*3]->())
+MATCH (n {name:'Rachel Kempson'}) RETURN exists((n)-[:MARRIED|HAS_CHILD*3]->())
 
 21
-MATCH (n) RETURN coalesce(n.birthyear, n.name)
-MATCH (n) RETURN CASE n.name WHEN null THEN false ELSE true END AS hasName
-MATCH p = (n {name:'Rachel Kempson'})-[*0..3]->() RETURN p,length(p)
-MATCH (n) RETURN n.name, "
-         "CASE WHEN n.birthyear IS NULL THEN -1 "
-         "ELSE n.birthyear + 10 END AS birth_10_years_later
-MATCH (n) RETURN exists(n.name) AS has_name,exists(n.title) AS has_title,label(n)
-MATCH (n) RETURN n,CASE exists(n.name) WHEN true THEN n.name ELSE n.title END AS content
-MATCH (n) RETURN n,n.name AS name ORDER BY name
+
+use this
+MATCH (n:Account {id:2251799813685615})-[:transfer*2]-(m:Account) RETURN count(m);
+MATCH (n:Account {id:2251799813685615})-[:transfer*2]-() RETURN count(m);
+
+
+#12 5061.6 Expected equality of these values:
+#12 5061.6   ctx->result_->Size()
+#12 5061.6     Which is: 7
+#12 5061.6   check[i]
+#12 5061.6     Which is: 12
+#12 5061.6 test/test_cypher.cpp:125: Failure
+#12 5061.6 Expected equality of these values:
+#12 5061.6   ctx->result_->Size()
+#12 5061.6     Which is: 5
+#12 5061.6   check[i]
+#12 5061.6     Which is: 8
+#12 5061.7 test/test_cypher.cpp:125: Failure
+#12 5061.7 Expected equality of these values:
+#12 5061.7   ctx->result_->Size()
+#12 5061.7     Which is: 5
+#12 5061.7   check[i]
+#12 5061.7     Which is: 8
+#12 5061.7 test/test_cypher.cpp:125: Failure
+#12 5061.7 Expected equality of these values:
+#12 5061.7   ctx->result_->Size()
+#12 5061.7     Which is: 3
+#12 5061.7   check[i]
+#12 5061.7     Which is: 6
+
+match (:Person {name:'Vanessa Redgrave'})<-[:HAS_CHILD]-(p)-[:ACTED_IN*0..]->(m) return p.name,m order by p.name
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN m.name this
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name this
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name this
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name LIMIT 5
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name SKIP 2 this
+MATCH (n:Person {name:'Vanessa Redgrave'})-[*2]-(m:Person) RETURN DISTINCT m.name ORDER BY m.name SKIP 2 LIMIT 3
 
 
 ### cr1
