@@ -215,8 +215,11 @@ MATCH (n {name:'Rachel Kempson'}) RETURN exists((n)-[:MARRIED|HAS_CHILD*3]->())
 21
 
 use this
-MATCH (n:Account {id:2251799813685615})-[:transfer*2]-(m:Account) RETURN count(m);
-MATCH (n:Account {id:2251799813685615})-[:transfer*2]-() RETURN count(m);
+MATCH (m:Account {id:1688849860276589})-[:transfer*2]-(n:Account) RETURN count(n);
+MATCH (m:Account {id:2533274790404746})-[:transfer*3]-(n:Account) RETURN count(n);
+
+MATCH (m:Person)-[:guarantee*2]-(n:Person) RETURN count(n);
+MATCH (m:Account{id:6474749098079904})-[:withdraw*3]-(n:Account) RETURN count(n);
 
 
 #12 5061.6 Expected equality of these values:
